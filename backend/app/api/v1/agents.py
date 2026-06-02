@@ -1,23 +1,37 @@
-from fastapi import APIRouter
+from fastapi import APIRouter, HTTPException
 from typing import List
+from uuid import uuid4
+from pydantic import BaseModel
 
 router = APIRouter()
 
-# Placeholder in‑memory store
-_agents: List[dict] = []
+# In‑memory store for demo purposes
+_agents: dict[str, dict] = {}
 
-@router.get("/agents")
+class AgentCreate(BaseModel):
+    name: str
+    role: str
+    objective: str
+
+class AgentRead(BaseModel):
+    id: str
+    name: str
+    role: str
+    objective: str
+    status: str = "idle"
+
+@router.post("/agents", response_model=AgentRead)
+async def create_agent(agent: AgentCreate):
+    agent_id = str(uuid4())
+    _agents[agent_id] = agent.dict()
+    return AgentRead(id=agent_id, **agent.dict())
+
+@router.get("/agents", response_model=List[AgentRead])
 async def list_agents():
-    return {"agents": _agents}
+    return [AgentRead(id=aid, **adata) for aid, adata in _agents.items()]
 
-@router.post("/agents")
-async def create_agent(agent: dict):
-    _agents.append(agent)
-    return {"msg": "agent created", "agent": agent}
-
-@router.get("/agents/{agent_id}")
+@router.get("/agents/{agent_id}", response_model=AgentRead)
 async def get_agent(agent_id: str):
-    for a in _agents:
-        if a.get("id") == agent_id:
-            return a
-    return {"error": "not found"}
+    if agent_id not in _agents:
+        raise HTTPException(status_code=404, detail="Agent not found")
+    return AgentRead(id=agent_id, **_agents[agent_id])
