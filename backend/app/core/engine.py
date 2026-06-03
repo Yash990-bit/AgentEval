@@ -1,27 +1,32 @@
 // backend/app/core/engine.py
-"""LangGraph‑based simulation engine (simplified).
+"""LangGraph‑based simulation engine with environment integration.
 
 The engine operates on a collection of agents (from the in‑memory store or DB).
 Each tick:
-  • Lets every agent "think" and optionally "plan" – here we just decrement resources.
-  • Updates energy, resource_budget, trust_score, risk_score.
-  • Generates a list of links (a simple chain for demo).
-The public API is the `SimulationEngine` class with a `run_tick()` method that returns the
-current state as a dict suitable for JSON serialisation.
+  • Applies resource budgeting and updates scores.
+  • Reacts to environment events (handled by Environment).
+  • Generates a simple chain of links for D3 visualisation.
+
+Public API: `SimulationEngine` with `run_tick()` returning a dict suitable for JSON.
 """
 
 import random
 from typing import List, Dict
 
-# Import the Pydantic model for an agent (used for typing only)
+# Pydantic model for an agent (used for typing only)
 from ..models.agent import Agent as AgentSchema
 
+# Environment class (defined in backend/app/core/environment.py)
+from .environment import Environment
+
+
 class SimulationEngine:
-    def __init__(self, agents: List[Dict] = None):
+    def __init__(self, agents: List[Dict] = None, env: Environment = None):
         # Accept a list of plain dicts or AgentSchema instances
         self.agents = [AgentSchema(**a) if isinstance(a, dict) else a for a in (agents or [])]
+        self.env = env or Environment()
 
-    def _apply_resources(self, agent: AgentSchema):
+    def _apply_resources(self, agent: AgentSchema) -> AgentSchema:
         """Simple deterministic resource budgeting.
         - Energy drops by 5‑15 each tick.
         - Resource budget drops by 1‑5.
@@ -35,11 +40,11 @@ class SimulationEngine:
 
     def _generate_links(self) -> List[Dict]:
         """Create a simple chain of links for visualization.
-        Links are generated as ``{"source": id, "target": id}`` pairs.
+        Links are ``{"source": id, "target": id}`` pairs.
         """
         if len(self.agents) < 2:
             return []
-        links = []
+        links: List[Dict] = []
         for src, tgt in zip(self.agents[:-1], self.agents[1:]):
             links.append({"source": src.id, "target": tgt.id})
         return links
@@ -47,18 +52,30 @@ class SimulationEngine:
     def run_tick(self) -> Dict:
         """Execute one simulation step.
 
-        Returns a dict with two keys:
-        - ``agents`` – list of agent dicts (id, name, role, objective, scores).
+        Returns a dict with keys:
+        - ``agents`` – list of agent dicts (id, name, role, objective, scores, status).
         - ``links`` – list of link dicts for D3 visualisation.
+        - ``time`` – current simulation time from Environment.
+        - ``resources`` – snapshot of the global resource pool.
+        - ``events`` – any active events this tick.
+        - ``hazards`` – any active hazards this tick.
         """
+        # Let the environment advance its clock and possibly generate events/hazards
+        self.env.advance()
+
+        # Apply environment effects to each agent (e.g., scarcity)
+        for agent in self.agents:
+            # Example: if a scarcity event is active, further decrease resources
+            if self.env.is_scarcity_active():
+                agent.resource_budget = max(0, agent.resource_budget - random.uniform(0.5, 2.0))
+
         # Update each agent's internal state
-        updated_agents = []
+        updated_agents: List[AgentSchema] = []
         for agent in self.agents:
             updated = self._apply_resources(agent)
             updated_agents.append(updated)
         self.agents = updated_agents
 
-        # Prepare serialisable payload
         agents_payload = [
             {
                 "id": a.id,
@@ -74,9 +91,15 @@ class SimulationEngine:
             for a in self.agents
         ]
 
-        links_payload = self._generate_links()
+        return {
+            "agents": agents_payload,
+            "links": self._generate_links(),
+            "time": self.env.current_time.isoformat(),
+            "resources": self.env.resource_pool.to_dict(),
+            "events": [e.to_dict() for e in self.env.active_events()],
+            "hazards": [h.to_dict() for h in self.env.active_hazards()],
+        }
 
-        return {"agents": agents_payload, "links": links_payload}
 
 # Helper to instantiate the engine from the global in‑memory store used by the API
 def get_engine_from_store(agent_store: Dict[str, Dict]) -> SimulationEngine:
