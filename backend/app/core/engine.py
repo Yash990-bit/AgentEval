@@ -1,4 +1,4 @@
-// backend/app/core/engine.py
+
 """LangGraph‑based simulation engine with environment integration.
 
 The engine operates on a collection of agents (from the in‑memory store or DB).

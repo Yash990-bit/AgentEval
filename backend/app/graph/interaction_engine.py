@@ -2,63 +2,83 @@ import datetime
 from typing import Any, Dict, List, Set, Tuple
 
 from ..utils.redis_pub import publish_event
-
+from fastapi import HTTPException
+from ..socket import socket_manager
 
 class InteractionEngine:
-    """In‑memory interaction engine for agent communication.
+    """Interaction engine handling messages, resources, trust, and relationships.
 
-    This is a lightweight implementation suitable for unit testing and early
-    development. It stores messages, resource budgets, and alliances in Python
-    data structures. In production you would replace these with persistent DB
-    calls.
+    Trust updates follow the formulas:
+    - Increase: ``new = min(old + delta, 1.0)``
+    - Decrease: ``new = max(old + delta, 0.0)``
+    where ``delta`` can be positive or negative.
     """
 
     def __init__(self, simulation_id: str):
         self.simulation_id = simulation_id
-        # Store messages as a list of dicts
         self.messages: List[Dict[str, Any]] = []
-        # Resource budgets per agent_id
         self.resource_budgets: Dict[str, Dict[str, Any]] = {}
-        # Negotiations history
         self.negotiations: List[Dict[str, Any]] = []
-        # Alliances stored as a set of frozenset pairs for quick lookup
         self.alliances: Set[frozenset] = set()
+        self.trust_scores: Dict[str, Dict[str, float]] = {}
+        from .agent_graph import AgentGraph
+        self.graph = AgentGraph(simulation_id)
+
+    def _socket_emit(self, event: str, payload: Any):
+        """Safely emit events to socket_manager checking for a running asyncio loop."""
+        if socket_manager.app is not None:
+            import asyncio
+            try:
+                loop = asyncio.get_running_loop()
+                loop.create_task(socket_manager.emit(event, payload))
+            except RuntimeError:
+                # No running event loop (e.g. running in synchronous tests)
+                pass
 
     # ---------------------------------------------------------------------
     # Helper utilities
     # ---------------------------------------------------------------------
     def _ensure_budget(self, agent_id: str) -> Dict[str, Any]:
-        """Return the budget dict for *agent_id*, creating a default one if
-        it does not exist.
+        """Return (or create) a budget dict for *agent_id*.
+        Default budget gives 100 API calls so that agents can send messages out of the box.
         """
         if agent_id not in self.resource_budgets:
-            # Default budgets – generous for tests
             self.resource_budgets[agent_id] = {
                 "compute_units": 0.0,
-                "api_calls": 0,
+                "api_calls": 100,
                 "tokens": 0,
                 "usd_budget": 0.0,
             }
         return self.resource_budgets[agent_id]
 
-    # ---------------------------------------------------------------------
-    # Public interaction methods
-    # ---------------------------------------------------------------------
-    def send_message(
-        self, sender_id: str, receiver_id: str, message_type: str, content: Any
-    ) -> Dict[str, Any]:
-        """Send a message from *sender_id* to *receiver_id*.
+    def _ensure_trust(self, agent_id: str) -> Dict[str, float]:
+        if agent_id not in self.trust_scores:
+            self.trust_scores[agent_id] = {}
+        return self.trust_scores[agent_id]
 
-        The method validates that the sender has at least one API call left (cost
-        = 1). It then records the message, updates the sender's ``api_calls``
-        budget and publishes a ``message_sent`` event.
-        """
+    def _update_trust(self, source_id: str, target_id: str, delta: float):
+        trust = self._ensure_trust(source_id)
+        old = trust.get(target_id, 0.5)  # neutral start
+        new = min(max(old + delta, 0.0), 1.0)
+        trust[target_id] = new
+        payload = {
+            "simulation_id": self.simulation_id,
+            "source_id": source_id,
+            "target_id": target_id,
+            "old_trust": old,
+            "new_trust": new,
+        }
+        publish_event("trust_changed", payload)
+        self._socket_emit("trust_changed", payload)
+
+    # ---------------------------------------------------------------------
+    # Core interaction methods
+    # ---------------------------------------------------------------------
+    def send_message(self, sender_id: str, receiver_id: str, message_type: str, content: Any) -> Dict[str, Any]:
         sender_budget = self._ensure_budget(sender_id)
         if sender_budget.get("api_calls", 0) < 1:
-            raise ValueError("Sender does not have enough API call budget")
-        # Consume one API call
-        sender_budget["api_calls"] = sender_budget.get("api_calls", 0) - 1
-
+            raise HTTPException(status_code=400, detail="Sender does not have enough API call budget")
+        sender_budget["api_calls"] -= 1
         msg = {
             "simulation_id": self.simulation_id,
             "timestamp": datetime.datetime.utcnow().isoformat(),
@@ -68,89 +88,95 @@ class InteractionEngine:
             "content": content,
         }
         self.messages.append(msg)
-        publish_event(
-            "message_sent",
-            {
-                "simulation_id": self.simulation_id,
-                "sender_id": sender_id,
-                "receiver_id": receiver_id,
-                "type": message_type,
-            },
-        )
+        publish_event("message_sent", {
+            "simulation_id": self.simulation_id,
+            "sender_id": sender_id,
+            "receiver_id": receiver_id,
+            "type": message_type,
+        })
+        self._socket_emit("new_message", msg)
         return msg
 
-    def share_resource(
-        self,
-        sender_id: str,
-        receiver_id: str,
-        resource_type: str,
-        amount: float,
-    ) -> Tuple[Dict[str, Any], Dict[str, Any]]:
-        """Transfer *amount* of *resource_type* from *sender* to *receiver*.
-
-        Raises ``ValueError`` if the sender does not have sufficient resources.
-        """
+    def share_resource(self, sender_id: str, receiver_id: str, resource_type: str, amount: float) -> Tuple[Dict[str, Any], Dict[str, Any]]:
         if resource_type not in {"compute_units", "api_calls", "tokens", "usd_budget"}:
-            raise ValueError(f"Unsupported resource type: {resource_type}")
+            raise HTTPException(status_code=400, detail=f"Unsupported resource type: {resource_type}")
         sender_budget = self._ensure_budget(sender_id)
         receiver_budget = self._ensure_budget(receiver_id)
         if sender_budget.get(resource_type, 0) < amount:
-            raise ValueError("Sender lacks sufficient resource balance")
-        # Perform atomic transfer
-        sender_budget[resource_type] = sender_budget.get(resource_type, 0) - amount
-        receiver_budget[resource_type] = receiver_budget.get(resource_type, 0) + amount
-        publish_event(
-            "resource_transferred",
-            {
-                "simulation_id": self.simulation_id,
-                "sender_id": sender_id,
-                "receiver_id": receiver_id,
-                "resource_type": resource_type,
-                "amount": amount,
-            },
-        )
+            raise HTTPException(status_code=400, detail="Sender lacks sufficient resource balance")
+        sender_budget[resource_type] -= amount
+        receiver_budget[resource_type] += amount
+        publish_event("resource_transferred", {
+            "simulation_id": self.simulation_id,
+            "sender_id": sender_id,
+            "receiver_id": receiver_id,
+            "resource_type": resource_type,
+            "amount": amount,
+        })
+        # Trust gain for cooperation
+        self._update_trust(sender_id, receiver_id, 0.05)
+        self._socket_emit("resource_transferred", {
+            "simulation_id": self.simulation_id,
+            "sender_id": sender_id,
+            "receiver_id": receiver_id,
+            "resource_type": resource_type,
+            "amount": amount,
+        })
         return sender_budget, receiver_budget
 
-    def negotiate(
-        self, initiator_id: str, target_id: str, offer_payload: Dict[str, Any]
-    ) -> Dict[str, Any]:
-        """Record a negotiation offer from *initiator* to *target*.
+    def negotiate(self, initiator_id: str, target_id: str, offer_payload: Dict[str, Any]) -> Dict[str, Any]:
+        """Handle a negotiation offer using NegotiationGraph.
 
-        The current stub simply stores the proposal and emits an event – the
-        target's decision logic will be implemented elsewhere.
+        The NegotiationGraph class builds and compiles a LangGraph state graph
+        representing the multi-round negotiation process.
         """
-        negotiation = {
-            "simulation_id": self.simulation_id,
-            "timestamp": datetime.datetime.utcnow().isoformat(),
-            "initiator_id": initiator_id,
-            "target_id": target_id,
-            "offer": offer_payload,
-        }
-        self.negotiations.append(negotiation)
-        publish_event(
-            "negotiation_received",
-            {
-                "simulation_id": self.simulation_id,
-                "initiator_id": initiator_id,
-                "target_id": target_id,
-                "offer": offer_payload,
-            },
-        )
+        from .negotiation_graph import NegotiationGraph
+        graph = NegotiationGraph(self)
+        negotiation = graph.propose(initiator_id, target_id, offer_payload)
+        
+        # Emit the event as before
+        publish_event("negotiation_received", negotiation)
+        self._socket_emit("negotiation_received", negotiation)
         return negotiation
 
     def form_alliance(self, agent_a_id: str, agent_b_id: str) -> frozenset:
-        """Create a bilateral alliance between two agents.
-
-        Alliances are stored as an unordered pair (frozenset) to avoid duplicate
-        entries like (a,b) and (b,a).
-        """
         alliance = frozenset({agent_a_id, agent_b_id})
         self.alliances.add(alliance)
-        publish_event(
-            "alliance_formed",
-            {
-                "simulation_id": self.simulation_id,
-                "agents": list(alliance),
-            },
-        )
+        # Boost mutual trust
+        self._update_trust(agent_a_id, agent_b_id, 0.1)
+        self._update_trust(agent_b_id, agent_a_id, 0.1)
+        payload = {"simulation_id": self.simulation_id, "agents": list(alliance)}
+        publish_event("alliance_formed", payload)
+        self._socket_emit("alliance_formed", payload)
         return alliance
+
+    def declare_rivalry(self, agent_a_id: str, agent_b_id: str) -> None:
+        # Reduce trust
+        self._update_trust(agent_a_id, agent_b_id, -0.15)
+        self._update_trust(agent_b_id, agent_a_id, -0.15)
+        payload = {
+            "simulation_id": self.simulation_id,
+            "agents": [agent_a_id, agent_b_id],
+            "type": "rival",
+        }
+        publish_event("rivalry_declared", payload)
+        self._socket_emit("rivalry_declared", payload)
+        # Persist to DB
+        from ..db.session import SessionLocal
+        from ..db.models.relationship import AgentRelationship
+        import uuid
+        db = SessionLocal()
+        try:
+            rel = AgentRelationship(
+                simulation_id=uuid.UUID(self.simulation_id) if isinstance(self.simulation_id, str) else self.simulation_id,
+                agent_a_id=agent_a_id,
+                agent_b_id=agent_b_id,
+                relationship_type="rival",
+                trust_score=self.trust_scores.get(agent_a_id, {}).get(agent_b_id, 0.0),
+                interaction_count=0,
+                last_interaction_tick=0,
+            )
+            db.add(rel)
+            db.commit()
+        finally:
+            db.close()

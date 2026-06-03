@@ -1,9 +1,3 @@
-# backend/app/db/models.py
-"""SQLAlchemy models for the simulation backend.
-
-This schema follows the specification for the AABS project.
-"""
-
 import enum
 import uuid
 from sqlalchemy import (
@@ -16,7 +10,7 @@ from sqlalchemy import (
     Enum as SAEnum,
     func,
 )
-from sqlalchemy.dialects.postgresql import UUID, JSONB
+from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.ext.declarative import declarative_base
 
 Base = declarative_base()
@@ -44,8 +38,8 @@ class AgentModel(Base):
     name = Column(String(100), nullable=False)
     role = Column(SAEnum(AgentRole), nullable=False)
     objective = Column(String(500), nullable=False)
-    tools = Column(JSONB, nullable=False, default=list)  # list of tool IDs
-    resource_budget = Column(JSONB, nullable=False, default=lambda: {
+    tools = Column(JSON, nullable=False, default=list)  # list of tool IDs
+    resource_budget = Column(JSON, nullable=False, default=lambda: {
         "compute_units": 0,
         "api_calls": 0,
         "tokens": 0,
@@ -58,18 +52,22 @@ class AgentModel(Base):
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
 
+class Simulation(Base):
+    __tablename__ = "simulations"
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+
 class SimulationRun(Base):
     __tablename__ = "simulation_runs"
     id = Column(Integer, primary_key=True, autoincrement=True)
     timestamp = Column(DateTime(timezone=True), server_default=func.now())
-    state = Column(JSONB, nullable=False)  # snapshot of agents, links, etc.
+    state = Column(JSON, nullable=False)  # snapshot of agents, links, etc.
 
 class ResourceLog(Base):
     __tablename__ = "resource_logs"
     id = Column(Integer, primary_key=True, autoincrement=True)
     agent_id = Column(UUID(as_uuid=True), nullable=False)
     tick = Column(Integer, nullable=False)
-    resource_budget = Column(JSONB)
+    resource_budget = Column(JSON)
     energy_score = Column(Float)
     trust_score = Column(Float)
     risk_score = Column(Float)

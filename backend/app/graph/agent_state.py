@@ -17,8 +17,11 @@ class AgentState(BaseModel):
     messages_inbox: List[dict] = Field(default_factory=list)
     tools_called: List[dict] = Field(default_factory=list)
     resource_used: Dict[str, float] = Field(default_factory=lambda: {"compute_units": 0, "api_calls": 0, "tokens": 0, "usd_budget": 0.0})
+    resource_budget: Dict[str, float] = Field(default_factory=dict)
     trust_scores: Dict[str, float] = Field(default_factory=dict)
     goal_stack: List[dict] = Field(default_factory=list)
+    resource_requests: List[str] = Field(default_factory=list)
+    waiting_for: List[str] = Field(default_factory=list)
     loop_count: int = 0
     last_error: Optional[str] = None
     timestamp: datetime = Field(default_factory=datetime.utcnow)

@@ -1,6 +1,6 @@
 import uuid
 from datetime import datetime
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Tuple
 
 from ..utils.redis_pub import publish_event
 from .agent_state import AgentState
@@ -138,3 +138,26 @@ def execute_action(state: Dict[str, Any], action_name: str, *args, **kwargs) -> 
     if action_name not in ACTION_MAP:
         raise ValueError(f"Unsupported action: {action_name}")
     return ACTION_MAP[action_name](state, *args, **kwargs)
+
+
+class AgentGraphNode:
+    """Wrapper node for an agent within the AgentGraph, encapsulating their current AgentState."""
+    def __init__(self, agent_id: str, state: AgentState = None):
+        self.id = agent_id
+        self.state = state or AgentState(agent_id=agent_id)
+
+
+class AgentGraph:
+    """Simulation graph containing all active agent states, trust scores, and resource allocations."""
+    def __init__(self, simulation_id: str):
+        # Store simulation_id as a UUID object for ORM compatibility
+        try:
+            self.simulation_id = uuid.UUID(simulation_id)
+        except Exception:
+            # If already a UUID, keep as is
+            self.simulation_id = simulation_id
+        self.current_tick: int = 0
+        self.agents: Dict[str, AgentGraphNode] = {}
+        self.trust_matrix: Dict[Tuple[str, str], float] = {}
+        self.resource_allocation: Dict[str, List[Tuple[str, float]]] = {}
+
