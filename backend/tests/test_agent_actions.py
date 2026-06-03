@@ -16,6 +16,7 @@ from backend.app.graph.agent_graph import (
     fail,
 )
 
+
 @pytest.fixture
 def base_state():
     return {

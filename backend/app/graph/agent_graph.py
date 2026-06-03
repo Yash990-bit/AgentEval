@@ -1,4 +1,4 @@
-import random
+import uuid
 from datetime import datetime
 from typing import Any, Dict, List
 
@@ -10,11 +10,12 @@ def _consume(state: Dict[str, Any], energy: float = 0.0, compute_units: float = 
     """Update the agent's resource budget and energy score.
     Values are subtracted (clamped to >= 0). Returns a new state dict.
     """
+    # Create a shallow copy of the state to avoid mutating the original
     new_state = state.copy()
-    # Energy
+    # Energy handling (subtract, clamp to >=0)
     new_state["energy_score"] = max(0.0, new_state.get("energy_score", 1.0) - energy)
-    # Resource budget (JSONB structure)
-    budget = new_state.get("resource_budget", {})
+    # Deep copy the resource_budget dict to avoid side‑effects on the input state
+    budget = dict(new_state.get("resource_budget", {}))
     budget["compute_units"] = max(0.0, budget.get("compute_units", 0) - compute_units)
     budget["api_calls"] = max(0, budget.get("api_calls", 0) - api_calls)
     budget["tokens"] = max(0, budget.get("tokens", 0) - tokens)
@@ -25,7 +26,7 @@ def _consume(state: Dict[str, Any], energy: float = 0.0, compute_units: float = 
 # 1. think – placeholder LLM reasoning (simulated)
 def think(state: Dict[str, Any], input_data: Any) -> Dict[str, Any]:
     thought = {
-        "id": str(random.uuid4()) if hasattr(random, "uuid4") else str(datetime.utcnow().timestamp()),
+        "id": str(uuid.uuid4()) if hasattr(uuid, "uuid4") else str(datetime.utcnow().timestamp()),
         "timestamp": datetime.utcnow().isoformat(),
         "content": str(input_data),
     }
@@ -78,7 +79,8 @@ def negotiate(state: Dict[str, Any], proposal: Dict[str, Any]) -> Dict[str, Any]
 def cooperate(state: Dict[str, Any], partner_id: str, shared_data: Any) -> Dict[str, Any]:
     outbox = state.get("messages_outbox", [])
     outbox.append({"timestamp": datetime.utcnow().isoformat(), "type": "cooperate", "partner": partner_id, "data": shared_data})
-    new_state = _consume(state, energy=3.0, compute_units=0.2)
+    # Consume only compute_units and API calls, do not subtract energy
+    new_state = _consume(state, compute_units=0.2)
     # Increase energy modestly, capped at 1.0
     new_state["energy_score"] = min(1.0, new_state.get("energy_score", 0.0) + 0.1)
     new_state["messages_outbox"] = outbox
@@ -86,7 +88,7 @@ def cooperate(state: Dict[str, Any], partner_id: str, shared_data: Any) -> Dict[
     return new_state
 
 # 7. compete – attempt to acquire a contested resource
-    # Deterministic competition: energy decreases by stake * 0.01
+def compete(state: Dict[str, Any], opponent_id: str, stake: float) -> Dict[str, Any]:
     energy_change = stake * 0.01
     # Subtract energy once via _consume
     new_state = _consume(state, energy=energy_change, compute_units=0.1)
