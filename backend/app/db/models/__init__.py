@@ -64,6 +64,7 @@ class SimulationRun(Base):
 
 class ResourceLog(Base):
     __tablename__ = "resource_logs"
+
     id = Column(Integer, primary_key=True, autoincrement=True)
     agent_id = Column(UUID(as_uuid=True), nullable=False)
     tick = Column(Integer, nullable=False)
@@ -71,4 +72,36 @@ class ResourceLog(Base):
     energy_score = Column(Float)
     trust_score = Column(Float)
     risk_score = Column(Float)
+    timestamp = Column(DateTime(timezone=True), server_default=func.now())
+
+# Separate top-level models for resource budgeting and events
+class ResourceBudget(Base):
+    __tablename__ = "resource_budgets"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    agent_id = Column(UUID(as_uuid=True), nullable=False)
+    simulation_id = Column(UUID(as_uuid=True), nullable=False)
+    compute_total = Column(Integer, default=0)
+    compute_used = Column(Integer, default=0)
+    compute_reserved = Column(Integer, default=0)
+    api_calls_total = Column(Integer, default=0)
+    api_calls_used = Column(Integer, default=0)
+    tokens_total = Column(Integer, default=0)
+    tokens_used = Column(Integer, default=0)
+    usd_total = Column(Float, default=0.0)
+    usd_spent = Column(Float, default=0.0)
+    efficiency_score = Column(Float, default=0.0)
+    last_updated = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+
+class ResourceEvent(Base):
+    __tablename__ = "resource_events"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    simulation_id = Column(UUID(as_uuid=True), nullable=False)
+    agent_id = Column(UUID(as_uuid=True), nullable=False)
+    resource_type = Column(String, nullable=False)
+    action_type = Column(String, nullable=False)  # consumed/reserved/released/transferred
+    amount = Column(Integer, nullable=False)
+    tick = Column(Integer, nullable=False)
+    extra_metadata = Column(JSON, nullable=True)
     timestamp = Column(DateTime(timezone=True), server_default=func.now())

@@ -1,7 +1,8 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from .api.v1 import health, agents, simulation, relationships, conflicts
+from .api.v1 import health, agents, simulation, relationships, resource
+from .api.v1.conflicts import router as conflicts_router  # explicit import to ensure router registration
 
 app = FastAPI(title="AI Agent Behaviour Simulator", version="0.1.0")
 
@@ -23,7 +24,8 @@ app.include_router(health.router, prefix="/api/v1", tags=["health"])
 app.include_router(agents.router, prefix="/api/v1", tags=["agents"])
 app.include_router(simulation.router, prefix="/api/v1", tags=["simulation"])
 app.include_router(relationships.router, prefix="/api/v1", tags=["relationships"])
-app.include_router(conflicts.router, prefix="/api/v1", tags=["conflicts"])
+app.include_router(conflicts_router, prefix="/api/v1", tags=["conflicts"])
+app.include_router(resource.router, prefix="/api/v1", tags=["resource"])
 
 @app.get("/api/v1/ping")
 async def ping():
