@@ -327,6 +327,9 @@ class ConflictDetector:
             resolve_resource_conflict,
             resolve_goal_conflict,
             resolve_trust_breakdown,
+            resolve_communication_conflict,
+            resolve_deadlock,
+            resolve_priority_inversion,
         )
         if conflict.conflict_type == ConflictType.RESOURCE:
             resolve_resource_conflict(conflict, self.db, self.graph)
@@ -336,4 +339,13 @@ class ConflictDetector:
             conflict.status = ConflictStatus.AUTO_RESOLVED
         elif conflict.conflict_type == ConflictType.TRUST:
             resolve_trust_breakdown(conflict, self.db, self.graph)
+            conflict.status = ConflictStatus.AUTO_RESOLVED
+        elif conflict.conflict_type == ConflictType.COMMUNICATION:
+            resolve_communication_conflict(conflict, self.db, self.graph)
+            conflict.status = ConflictStatus.AUTO_RESOLVED
+        elif conflict.conflict_type == ConflictType.DEADLOCK:
+            resolve_deadlock(conflict, self.db, self.graph)
+            conflict.status = ConflictStatus.AUTO_RESOLVED
+        elif conflict.conflict_type == ConflictType.PRIORITY_INVERSION:
+            resolve_priority_inversion(conflict, self.db, self.graph)
             conflict.status = ConflictStatus.AUTO_RESOLVED

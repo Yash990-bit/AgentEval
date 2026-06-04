@@ -4,3 +4,4 @@ redis
 langgraph
 pydantic
 python-dotenv
+qdrant-client

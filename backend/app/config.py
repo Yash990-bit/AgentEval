@@ -12,3 +12,8 @@ RESOURCE_CAPACITY = {
     "tokens": 1000,
     "usd_budget": 10.0,
 }
+
+# Qdrant settings for Long‑Term Memory
+QDRANT_HOST = "localhost"
+QDRANT_PORT = 6333
+QDRANT_COLLECTION = "agent_ltm"

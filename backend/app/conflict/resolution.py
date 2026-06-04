@@ -46,17 +46,13 @@ def resolve_resource_conflict(conflict, db: Session, graph) -> None:
     # 4. Allocate share of budget to each agent
     for aid in agents_involved:
         share = (priorities[aid] / total_priority) * total_capacity
-        # Update in graph node state
         if aid in graph.agents:
             node = graph.agents[aid]
             if not hasattr(node.state, "resource_used"):
                 node.state.resource_used = {}
-            # Update the used resources budget
             used = node.state.resource_used
             if isinstance(used, dict):
                 used[resource_type] = round(share, 2)
-
-            # Ensure resource_budget dict exists and update it as well (expected by tests)
             if not hasattr(node.state, "resource_budget"):
                 node.state.resource_budget = {}
             budget = node.state.resource_budget
@@ -68,11 +64,7 @@ def resolve_goal_conflict(conflict, db: Session, graph) -> None:
     agents_involved = conflict.agents_involved
     if len(agents_involved) < 2:
         return
-
-    # Find agent with lowest priority
     lowest_agent_id = min(agents_involved, key=lambda aid: _get_agent_priority(aid, graph))
-
-    # Pause lower-priority agent (set status to sleeping)
     if lowest_agent_id in graph.agents:
         graph.agents[lowest_agent_id].state.status = "sleeping"
 
@@ -81,24 +73,61 @@ def resolve_trust_breakdown(conflict, db: Session, graph) -> None:
     agents_involved = conflict.agents_involved
     if len(agents_involved) < 2:
         return
-
-    agent_a_id = agents_involved[0]
-    agent_b_id = agents_involved[1]
-
-    # Boost trust score back up to 0.4 to start mediation
-    # Query database and update AgentRelationship
+    agent_a_id, agent_b_id = agents_involved[0], agents_involved[1]
     rel = db.query(AgentRelationship).filter(
         ((AgentRelationship.agent_a_id == agent_a_id) & (AgentRelationship.agent_b_id == agent_b_id)) |
         ((AgentRelationship.agent_a_id == agent_b_id) & (AgentRelationship.agent_b_id == agent_a_id))
     ).first()
-
     if rel:
         rel.trust_score = 0.4
         rel.relationship_type = RelationshipType.neutral
         db.add(rel)
         db.commit()
-
-    # In graph trust scores, also boost
     if hasattr(graph, "trust_matrix"):
         graph.trust_matrix[(agent_a_id, agent_b_id)] = 0.4
         graph.trust_matrix[(agent_b_id, agent_a_id)] = 0.4
+
+def resolve_communication_conflict(conflict, db: Session, graph) -> None:
+    """Resolve communication conflicts by flagging agents and clearing contradictory queues."""
+    agents = conflict.agents_involved
+    for aid in agents:
+        if aid in graph.agents:
+            agent = graph.agents[aid]
+            # Mark that the agent needs synchronization
+            setattr(agent.state, "communication_issue", True)
+            # Optional: clear pending contradictory messages (if stored in state)
+            if hasattr(agent.state, "pending_messages"):
+                agent.state.pending_messages = []
+
+def resolve_deadlock(conflict, db: Session, graph) -> None:
+    """Break a deadlock by pre‑empting the lowest‑priority agent in the cycle."""
+    agents = conflict.agents_involved
+    if not agents:
+        return
+    # Identify lowest‑priority agent
+    lowest = min(agents, key=lambda aid: _get_agent_priority(aid, graph))
+    if lowest in graph.agents:
+        agent = graph.agents[lowest]
+        # Remove its waiting list to break the cycle
+        if hasattr(agent.state, "waiting_for"):
+            agent.state.waiting_for = []
+        # Optionally set a status indicating pre‑emption
+        agent.state.status = "preempted"
+
+def resolve_priority_inversion(conflict, db: Session, graph) -> None:
+    """Fix priority inversion by re‑allocating the contested resource to the higher‑priority agent."""
+    agents = conflict.agents_involved
+    if len(agents) != 2:
+        return
+    low, high = agents[0], agents[1]
+    # Find the resource where inversion occurs
+    for resource, owners in list(graph.resource_allocation.items()):
+        owner_ids = {owner[0] for owner in owners}
+        if low in owner_ids and high in owner_ids:
+            # Remove low‑priority holder
+            new_owners = [(aid, prio) for aid, prio in owners if aid != low]
+            # Add high‑priority holder with max priority (or keep existing)
+            if not any(aid == high for aid, _ in new_owners):
+                new_owners.append((high, _get_agent_priority(high, graph)))
+            graph.resource_allocation[resource] = new_owners
+            break
