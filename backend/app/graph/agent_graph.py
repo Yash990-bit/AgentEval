@@ -34,6 +34,20 @@ def think(state: Dict[str, Any], input_data: Any) -> Dict[str, Any]:
     short_term.append(thought)
     new_state = _consume(state, energy=2.0, compute_units=0.1)
     new_state["memory_short_term"] = short_term
+    # Apply hallucination injection if triggered
+    try:
+        from .failure_engine import HallucinationInjector, FailureInjector
+        # First, register any custom hallucination probability (default 0.1)
+        # Here we assume failure_type "hallucination" is used
+        # Apply mutation to the output state (or specific fields)
+        new_state = HallucinationInjector.maybe_hallucinate(
+            simulation_id=state.get("simulation_id"),
+            target_agent_id=state.get("agent_id"),
+            original_output=new_state,
+        )
+    except Exception:
+        # If imports fail or injector not available, ignore and proceed
+        pass
     publish_event("thought_generated", {"agent_id": state.get("agent_id"), "thought": thought})
     return new_state
 
@@ -58,12 +72,28 @@ def communicate(state: Dict[str, Any], message: str, target_agent_id: str = None
 
 # 4. use_tool – invoke a tool and store result
 def use_tool(state: Dict[str, Any], tool_id: str, payload: Any) -> Dict[str, Any]:
+    """Invoke a tool and store result, with optional injected failure.
+    If a `tool_failure` injection is active for this agent/simulation, the tool call
+    registers the failure and raises a `ToolTimeoutError` (or `ToolHTTPError`).
+    """
+    # Retrieve simulation and agent identifiers from state
+    simulation_id = state.get("simulation_id")
+    agent_id = state.get("agent_id")
+
+    # Check for injected tool failure
+    if simulation_id and agent_id and FailureInjector.is_triggered(simulation_id, agent_id, "tool_failure"):
+        # Register the failure for cascading logic
+        CascadingFailureHandler.register_failure(simulation_id, agent_id, tool_id)
+        # Simulate a timeout error
+        raise ToolTimeoutError(f"Injected tool failure for {tool_id} in simulation {simulation_id}")
+
+    # Normal tool execution (placeholder logic)
     tools = state.get("tools_called", [])
     result = {"tool_id": tool_id, "payload": payload, "result": f"result_of_{tool_id}", "timestamp": datetime.utcnow().isoformat()}
     tools.append(result)
     new_state = _consume(state, energy=4.0, api_calls=1, compute_units=0.5)
     new_state["tools_called"] = tools
-    publish_event("tool_used", {"agent_id": state.get("agent_id"), "tool_id": tool_id, "payload": payload})
+    publish_event("tool_used", {"agent_id": agent_id, "tool_id": tool_id, "payload": payload})
     return new_state
 
 # 5. negotiate – request resource from another agent (simple record)

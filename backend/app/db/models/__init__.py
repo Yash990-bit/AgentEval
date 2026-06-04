@@ -106,6 +106,7 @@ class ResourceEvent(Base):
     extra_metadata = Column(JSON, nullable=True)
     timestamp = Column(DateTime(timezone=True), server_default=func.now())
 
-# Register episodic and shared memory models on Base
+# Register episodic, shared memory, and failure event models on Base
 from app.models.shared_memory import SharedMemory
 from app.models.episodic_memory import EpisodicMemory
+from app.models.failure_event import FailureEvent
