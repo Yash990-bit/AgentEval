@@ -3,9 +3,10 @@ from pydantic import BaseModel
 from typing import List, Optional
 from uuid import UUID
 
-from app.services.failure_engine import FailureInjector, FailureDetector
-from app.models.failure_event import FailureEvent
-from app.db.session import get_db
+# Relative imports within the backend package
+from ..services.failure_engine import FailureInjector, FailureDetector
+from ..models.failure_event import FailureEvent
+from ..db.session import get_db
 from sqlalchemy.orm import Session
 
 router = APIRouter()

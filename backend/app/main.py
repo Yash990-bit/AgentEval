@@ -2,7 +2,8 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 # Import API routers
-from .api.v1 import health, agents, simulation, relationships, resource, failures as failures_module
+from .api.v1 import health, agents, simulation, relationships, resource, failures as failures_module, emergent
+from .api.v1.trust import router as trust_router
 from .api.v1.conflicts import router as conflicts_router
 
 app = FastAPI(title="AI Agent Behaviour Simulator", version="0.1.0")
@@ -28,6 +29,8 @@ app.include_router(relationships.router, prefix="/api/v1", tags=["relationships"
 app.include_router(conflicts_router, prefix="/api/v1", tags=["conflicts"])
 app.include_router(resource.router, prefix="/api/v1", tags=["resource"])
 app.include_router(failures_module.router, prefix="/api/v1", tags=["failures"])
+app.include_router(emergent.router, prefix="/api/v1", tags=["emergent"])
+app.include_router(trust_router, prefix="/api/v1", tags=["trust"])
 @app.on_event("startup")
 async def start_failure_detection():
     import asyncio

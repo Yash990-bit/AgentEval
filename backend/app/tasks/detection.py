@@ -24,5 +24,8 @@ def run_failure_detection(simulation_id: str, tick: int):
     try:
         agents_state = get_agents_state(simulation_id)
         run_detection_cycle(db, simulation_id, agents_state, tick)
+        # ----- emergent behavior detection -----
+        from app.services.emergent_engine import run_emergent_detection_cycle
+        run_emergent_detection_cycle(db, simulation_id, tick)
     finally:
         db.close()
