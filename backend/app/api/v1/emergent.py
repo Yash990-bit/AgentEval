@@ -26,3 +26,10 @@ router = APIRouter()
 def get_emergent_events(simulation_id: str, db: Session = Depends(get_db)):
     """Return all emergent events recorded for a simulation."""
     return db.query(EmergentLog).filter(EmergentLog.simulation_id == simulation_id).all()
+
+@router.post("/emergent/{simulation_id}/run")
+def run_emergent_detection(simulation_id: str, tick: int, db: Session = Depends(get_db)):
+    """Execute emergent detection detectors for the given simulation tick."""
+    from app.services.emergent_engine import run_emergent_detection_cycle
+    run_emergent_detection_cycle(db, simulation_id, tick)
+    return {"status": "completed", "simulation_id": simulation_id, "tick": tick}

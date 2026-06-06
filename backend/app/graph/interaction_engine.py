@@ -5,6 +5,11 @@ from ..utils.redis_pub import publish_event
 from fastapi import HTTPException
 from ..socket import socket_manager
 
+# Trust engine integration imports
+from ..db.session import SessionLocal
+from ..services import get_trust_engine
+
+
 class InteractionEngine:
     """Interaction engine handling messages, resources, trust, and relationships.
 
@@ -23,7 +28,13 @@ class InteractionEngine:
         self.trust_scores: Dict[str, Dict[str, float]] = {}
         from .agent_graph import AgentGraph
         self.graph = AgentGraph(simulation_id)
+        # Initialize DB session and TrustEngine
+        self._db = SessionLocal()
+        self.trust_engine = get_trust_engine(self._db)
 
+    # ---------------------------------------------------------------------
+    # Helper utilities
+    # ---------------------------------------------------------------------
     def _socket_emit(self, event: str, payload: Any):
         """Safely emit events to socket_manager checking for a running asyncio loop."""
         if socket_manager.app is not None:
@@ -35,9 +46,6 @@ class InteractionEngine:
                 # No running event loop (e.g. running in synchronous tests)
                 pass
 
-    # ---------------------------------------------------------------------
-    # Helper utilities
-    # ---------------------------------------------------------------------
     def _ensure_budget(self, agent_id: str) -> Dict[str, Any]:
         """Return (or create) a budget dict for *agent_id*.
         Default budget gives 100 API calls so that agents can send messages out of the box.
@@ -57,16 +65,20 @@ class InteractionEngine:
         return self.trust_scores[agent_id]
 
     def _update_trust(self, source_id: str, target_id: str, delta: float):
+        # Update in‑memory trust map for quick UI feedback
         trust = self._ensure_trust(source_id)
         old = trust.get(target_id, 0.5)  # neutral start
         new = min(max(old + delta, 0.0), 1.0)
         trust[target_id] = new
+        # Persist the change via TrustEngine
+        self.trust_engine.update_trust(source_id, target_id, new)
         payload = {
             "simulation_id": self.simulation_id,
             "source_id": source_id,
             "target_id": target_id,
             "old_trust": old,
             "new_trust": new,
+            "delta": delta,
         }
         publish_event("trust_changed", payload)
         self._socket_emit("trust_changed", payload)
@@ -133,8 +145,6 @@ class InteractionEngine:
         from .negotiation_graph import NegotiationGraph
         graph = NegotiationGraph(self)
         negotiation = graph.propose(initiator_id, target_id, offer_payload)
-        
-        # Emit the event as before
         publish_event("negotiation_received", negotiation)
         self._socket_emit("negotiation_received", negotiation)
         return negotiation
@@ -161,7 +171,7 @@ class InteractionEngine:
         }
         publish_event("rivalry_declared", payload)
         self._socket_emit("rivalry_declared", payload)
-        # Persist to DB
+        # Persist relationship to DB (unchanged)
         from ..db.session import SessionLocal
         from ..db.models.relationship import AgentRelationship
         import uuid

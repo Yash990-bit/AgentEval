@@ -7,7 +7,6 @@ from app.core.state import get_engine
 
 router = APIRouter()
 
-# Dependency to get DB session
 def get_db():
     db = SessionLocal()
     try:

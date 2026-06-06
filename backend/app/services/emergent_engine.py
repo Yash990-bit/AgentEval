@@ -55,6 +55,7 @@ def detect_information_cascade(db: Session, simulation_id: str, tick: int, thres
     Returns details of each cascade found.
     """
     engine = get_engine(simulation_id)
+    G = engine.graph
     messages = getattr(engine, "messages", [])
     if not messages:
         return []

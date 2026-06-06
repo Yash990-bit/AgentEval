@@ -29,6 +29,18 @@ def apply_trust_event(event: TrustEvent, db: Session = Depends(get_db)):
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
     return {"msg": "event applied"}
+    try:
+        engine.apply_event(
+            simulation_id=event.simulation_id,
+            source_agent_id=event.source_agent_id,
+            target_agent_id=event.target_agent_id,
+            event_type=event.event_type,
+
+@router.get("/trust/edges")
+def get_trust_edges(simulation_id: str = Query(...), db: Session = Depends(get_db)):
+    engine = get_trust_engine(db)
+    edges = engine.get_all_edges(simulation_id)
+    return [{"source": e.source_agent_id, "target": e.target_agent_id, "trust_score": e.trust_score, "influence_score": e.influence_score} for e in edges]
 
 @router.post("/trust/propagate")
 def propagate(simulation_id: str = Query(...), db: Session = Depends(get_db)):
