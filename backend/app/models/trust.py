@@ -1,23 +1,21 @@
 from uuid import uuid4
 from datetime import datetime
 from sqlalchemy import Column, String, Float, Integer, DateTime, JSON, ForeignKey
-from sqlalchemy.dialects.postgresql import UUID, JSONB
-from sqlalchemy.orm import declarative_base
-
-Base = declarative_base()
+from sqlalchemy.dialects.postgresql import UUID
+from app.db.models import Base
 
 class AgentTrustEdge(Base):
     __tablename__ = "agent_trust_edges"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid4)
     simulation_id = Column(UUID(as_uuid=True), nullable=False, index=True)
-    source_agent_id = Column(UUID(as_uuid=True), nullable=False, index=True)
-    target_agent_id = Column(UUID(as_uuid=True), nullable=False, index=True)
+    source_agent_id = Column(String, nullable=False, index=True)
+    target_agent_id = Column(String, nullable=False, index=True)
     trust_score = Column(Float, nullable=False, default=0.0)
     influence_score = Column(Float, nullable=False, default=0.0)
     last_updated_tick = Column(Integer, nullable=False, default=0)
-    # JSONB array of objects {"tick": int, "score": float}
-    history = Column(JSONB, nullable=False, default=list)
+    # JSON array of objects {"tick": int, "score": float}
+    history = Column(JSON, nullable=False, default=list)
 
     __table_args__ = (
         # Composite index for quick lookups

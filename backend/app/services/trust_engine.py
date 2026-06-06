@@ -1,10 +1,10 @@
 import datetime
-from typing import List, Dict, Any
+from typing import Any
 from sqlalchemy.orm import Session
 from sqlalchemy import select, update, func, and_, or_
 
-from ..models.trust import AgentTrustEdge
-from ..models.base import Base  # Assuming Base is defined elsewhere for metadata
+from app.models.trust import AgentTrustEdge
+from app.db.models import Base
 
 class TrustEngine:
     """Engine to manage trust relationships between agents.
@@ -177,7 +177,7 @@ class TrustEngine:
             edge.history.append({"tick": current_tick, "score": edge.trust_score})
         self.session.flush()
 
-        def get_all_edges(self, simulation_id: str) -> List[AgentTrustEdge]:
+    def get_all_edges(self, simulation_id: str) -> List[AgentTrustEdge]:
         """Return all trust edges for a simulation."""
         return (
             self.session.execute(
