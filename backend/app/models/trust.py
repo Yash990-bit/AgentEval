@@ -8,7 +8,7 @@ class AgentTrustEdge(Base):
     __tablename__ = "agent_trust_edges"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid4)
-    simulation_id = Column(UUID(as_uuid=True), nullable=False, index=True)
+    simulation_id = Column(String, nullable=False, index=True)
     source_agent_id = Column(String, nullable=False, index=True)
     target_agent_id = Column(String, nullable=False, index=True)
     trust_score = Column(Float, nullable=False, default=0.0)

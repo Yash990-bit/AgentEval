@@ -25,6 +25,7 @@ class SimulationEngine:
         # Accept a list of plain dicts or AgentSchema instances
         self.agents = [AgentSchema(**a) if isinstance(a, dict) else a for a in (agents or [])]
         self.env = env or Environment()
+        self.tick_counter = 0
 
     def _apply_resources(self, agent: AgentSchema) -> AgentSchema:
         """Simple deterministic resource budgeting.
@@ -62,6 +63,7 @@ class SimulationEngine:
         """
         # Let the environment advance its clock and possibly generate events/hazards
         self.env.advance()
+        self.tick_counter += 1
 
         # Apply environment effects to each agent (e.g., scarcity)
         for agent in self.agents:
@@ -99,6 +101,59 @@ class SimulationEngine:
             "events": [e.to_dict() for e in self.env.active_events()],
             "hazards": [h.to_dict() for h in self.env.active_hazards()],
         }
+    def evaluate_agents(self) -> Dict:
+        """Compute evaluation scores for each agent.
+
+        Returns a dict with keys:
+        - `agents` – list of agent evaluation dicts (id, scores, composite, rank).
+        - `summary` – overall stats (average scores, etc.).
+        """
+        evaluations = []
+        for a in self.agents:
+            intelligence = 0.4 * (a.goals_completed / max(1, a.total_goals) * 100) + 0.3 * a.plan_quality + 0.3 * a.reasoning_depth
+            cooperation = 0.5 * (a.alliance_count / max(1, a.possible_alliances) * 100) + 0.3 * a.avg_trust_given + 0.2 * a.resource_sharing_rate
+            reliability = 0.4 * (100 - a.failure_rate) + 0.4 * a.deadline_hit_rate + 0.2 * (100 - a.hallucination_rate)
+            efficiency = 0.5 * a.resource_efficiency + 0.3 * a.goal_completion_speed_normalized + 0.2 * (100 - a.waste_rate)
+            risk = 0.3 * a.conflict_involvement_rate + 0.3 * a.escalation_rate + 0.4 * a.failure_propagation_score
+            
+            # Composite score (risk is lower = better, so invert it for composite)
+            composite = (
+                0.25 * intelligence +
+                0.20 * cooperation +
+                0.20 * reliability +
+                0.20 * efficiency +
+                0.15 * (100 - risk)
+            )
+            evaluations.append({
+                "id": a.id,
+                "name": a.name,
+                "intelligence": round(intelligence, 2),
+                "cooperation": round(cooperation, 2),
+                "reliability": round(reliability, 2),
+                "efficiency": round(efficiency, 2),
+                "risk": round(risk, 2),
+                "composite": round(composite, 2),
+            })
+            
+        # Rank agents by composite score descending
+        evaluations.sort(key=lambda x: x["composite"], reverse=True)
+        for rank, ev in enumerate(evaluations, start=1):
+            ev["rank"] = rank
+            
+        # Compute summary averages
+        if evaluations:
+            summary = {
+                "avg_intelligence": round(sum(e["intelligence"] for e in evaluations) / len(evaluations), 2),
+                "avg_cooperation": round(sum(e["cooperation"] for e in evaluations) / len(evaluations), 2),
+                "avg_reliability": round(sum(e["reliability"] for e in evaluations) / len(evaluations), 2),
+                "avg_efficiency": round(sum(e["efficiency"] for e in evaluations) / len(evaluations), 2),
+                "avg_risk": round(sum(e["risk"] for e in evaluations) / len(evaluations), 2),
+                "avg_composite": round(sum(e["composite"] for e in evaluations) / len(evaluations), 2),
+            }
+        else:
+            summary = {}
+            
+        return {"agents": evaluations, "summary": summary}
 
 
 # Helper to instantiate the engine from the global in‑memory store used by the API

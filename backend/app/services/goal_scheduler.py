@@ -8,6 +8,7 @@ from .goal_manager import GoalManager
 logger = logging.getLogger(__name__)
 
 class GoalScheduler:
+    
     """Runs on each simulation tick to advance goal states.
 
     - Starts pending goals whose dependencies are completed and resources are available.

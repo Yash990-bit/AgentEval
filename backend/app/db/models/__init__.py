@@ -110,3 +110,8 @@ class ResourceEvent(Base):
 from app.models.shared_memory import SharedMemory
 from app.models.episodic_memory import EpisodicMemory
 from app.models.failure_event import FailureEvent
+from app.models.simulation_analytics import SimulationAnalytics
+from app.models.agent_performance_metrics import AgentPerformanceMetrics
+from app.models.simulation_snapshot import SimulationSnapshot
+
+

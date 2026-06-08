@@ -71,7 +71,7 @@ class InteractionEngine:
         new = min(max(old + delta, 0.0), 1.0)
         trust[target_id] = new
         # Persist the change via TrustEngine
-        self.trust_engine.update_trust(source_id, target_id, new)
+        self.trust_engine.update_trust(self.simulation_id, source_id, target_id, new)
         payload = {
             "simulation_id": self.simulation_id,
             "source_id": source_id,

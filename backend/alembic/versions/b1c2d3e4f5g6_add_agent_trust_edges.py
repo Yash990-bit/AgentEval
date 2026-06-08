@@ -20,7 +20,7 @@ def upgrade() -> None:
         sa.Column("trust_score", sa.Float, nullable=False, server_default="0.0"),
         sa.Column("influence_score", sa.Float, nullable=False, server_default="0.0"),
         sa.Column("last_updated_tick", sa.Integer, nullable=False, server_default="0"),
-        sa.Column("history", postgresql.JSONB, nullable=False, server_default=sa.text('"[]"')),
+        sa.Column("history", sa.JSON, nullable=False, server_default=sa.text('"[]"')),
         sa.ForeignKeyConstraint(["simulation_id"], ["simulations.id"], ondelete="CASCADE"),
         sa.Index("ix_agent_trust_edges_sim_src_tgt", "simulation_id", "source_agent_id", "target_agent_id", unique=True),
     )

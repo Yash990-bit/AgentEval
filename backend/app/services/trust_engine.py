@@ -86,10 +86,37 @@ class TrustEngine:
             edge.trust_score = new_score
             edge.last_updated_tick = tick
             # Append to history JSONB array
-            if isinstance(edge.history, list):
-                edge.history.append({"tick": tick, "score": new_score})
-            else:
-                edge.history = [{"tick": tick, "score": new_score}]
+            new_history = list(edge.history) if isinstance(edge.history, list) else []
+            new_history.append({"tick": tick, "score": new_score})
+            edge.history = new_history
+        self.session.flush()
+
+    def update_trust(self, simulation_id: str, source_agent_id: str, target_agent_id: str, new_score: float) -> None:
+        edge: AgentTrustEdge | None = self.session.execute(
+            select(AgentTrustEdge)
+            .where(
+                AgentTrustEdge.simulation_id == simulation_id,
+                AgentTrustEdge.source_agent_id == source_agent_id,
+                AgentTrustEdge.target_agent_id == target_agent_id,
+            )
+        ).scalar_one_or_none()
+
+        if edge is None:
+            edge = AgentTrustEdge(
+                simulation_id=simulation_id,
+                source_agent_id=source_agent_id,
+                target_agent_id=target_agent_id,
+                trust_score=new_score,
+                influence_score=0.0,
+                last_updated_tick=0,
+                history=[{"tick": 0, "score": new_score}],
+            )
+            self.session.add(edge)
+        else:
+            edge.trust_score = new_score
+            new_history = list(edge.history) if isinstance(edge.history, list) else []
+            new_history.append({"tick": edge.last_updated_tick, "score": new_score})
+            edge.history = new_history
         self.session.flush()
 
     # ---------------------------------------------------------------------
@@ -140,7 +167,9 @@ class TrustEngine:
             if edge:
                 edge.trust_score = max(0.0, min(1.0, edge.trust_score + 0.02))
                 edge.last_updated_tick = edge.last_updated_tick  # keep same tick
-                edge.history.append({"tick": edge.last_updated_tick, "score": edge.trust_score})
+                new_history = list(edge.history) if isinstance(edge.history, list) else []
+                new_history.append({"tick": edge.last_updated_tick, "score": edge.trust_score})
+                edge.history = new_history
             else:
                 new_edge = AgentTrustEdge(
                     simulation_id=simulation_id,
@@ -174,7 +203,9 @@ class TrustEngine:
             decay_amount = 0.01 * (current_tick - edge.last_updated_tick - 14)
             edge.trust_score = max(0.0, edge.trust_score - decay_amount)
             # Note: we keep the original ``last_updated_tick`` so future decay is incremental.
-            edge.history.append({"tick": current_tick, "score": edge.trust_score})
+            new_history = list(edge.history) if isinstance(edge.history, list) else []
+            new_history.append({"tick": current_tick, "score": edge.trust_score})
+            edge.history = new_history
         self.session.flush()
 
     def get_all_edges(self, simulation_id: str) -> List[AgentTrustEdge]:

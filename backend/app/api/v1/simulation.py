@@ -1,15 +1,21 @@
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Depends
 from pydantic import BaseModel
-from typing import List, Dict
+from typing import List, Dict, Optional
+import uuid
 
 from ...core.engine import SimulationEngine, get_engine_from_store
 from ...core.environment import Environment
-
+from sqlalchemy.orm import Session
+from ...dependencies import get_db, get_s3_client
+from ...utils.s3_client import S3Client
+from ...services.snapshot_recorder import record_snapshot
 router = APIRouter(prefix="/simulation", tags=["simulation"])
 
 # In‑memory store of agents for simplicity; in real app this would query DB
 agent_store: Dict[str, Dict] = {}
 engine: SimulationEngine = None
+current_simulation_id: uuid.UUID = None
+
 
 def _ensure_engine():
     global engine
@@ -29,13 +35,31 @@ async def start_simulation(req: StartSimulationRequest):
     agent_store = {str(agent["id"]): agent for agent in req.agents}
     # Re‑create engine with these agents
     engine = SimulationEngine(list(agent_store.values()))
-    return {"status": "started", "agent_count": len(agent_store)}
+    # Generate a new simulation ID for this run
+    global current_simulation_id
+    current_simulation_id = uuid.uuid4()
+    return {"status": "started", "agent_count": len(agent_store), "simulation_id": str(current_simulation_id)}
 
 @router.post("/step")
-async def step_simulation():
-    """Advance the simulation by one tick and return the snapshot."""
+async def step_simulation(db: Session = Depends(get_db), s3: S3Client = Depends(get_s3_client)):
+    """Advance the simulation by one tick, record snapshot, and return it."""
     _ensure_engine()
     snapshot = engine.run_tick()
+    # Record snapshot to S3 and DB
+    if current_simulation_id is not None:
+        record_snapshot(db, s3, current_simulation_id, engine.tick_counter, snapshot)
+        try:
+            from app.services.analytics_service import compute_simulation_analytics
+            from app.api.v1.analytics import manager as analytics_manager
+            from fastapi.encoders import jsonable_encoder
+            import asyncio
+
+            analytics = compute_simulation_analytics(db, current_simulation_id, engine, engine.tick_counter)
+            serialized_analytics = jsonable_encoder(analytics)
+            asyncio.create_task(analytics_manager.broadcast(current_simulation_id, serialized_analytics))
+        except Exception as e:
+            # Do not block the simulation step if broadcasting fails
+            pass
     return snapshot
 
 @router.get("/state")
@@ -65,3 +89,10 @@ async def get_state():
         "links": engine._generate_links(),
     }
     return state
+
+
+@router.get("/evaluations")
+async def get_evaluations():
+    """Evaluate agents based on the engine metrics and return rankings."""
+    _ensure_engine()
+    return engine.evaluate_agents()

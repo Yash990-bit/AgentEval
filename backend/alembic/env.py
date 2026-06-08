@@ -20,10 +20,9 @@ if config.config_file_name is not None:
 # target_metadata = mymodel.Base.metadata
 import sys
 import os
-# Ensure the backend/app directory is on the Python path for model imports
-project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "app"))
-sys.path.append(project_root)
-from models import Base
+project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+sys.path.insert(0, project_root)
+from app.db.models import Base
 
 
 
