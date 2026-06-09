@@ -2,9 +2,23 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 # Import API routers
-from .api.v1 import health, agents, simulation, relationships, resource, failures as failures_module, emergent, agent_templates, replay, analytics
+from .api.v1 import (
+    health,
+    agents,
+    simulation,
+    relationships,
+    resource,
+    failures as failures_module,
+    emergent,
+    agent_templates,
+    replay,
+    analytics,
+    predictions,
+)
 from .api.v1.trust import router as trust_router
 from .api.v1.conflicts import router as conflicts_router
+
+"""FastAPI application entry point with all API routers, including predictions."""
 
 app = FastAPI(title="AI Agent Behaviour Simulator", version="0.1.0")
 
@@ -34,11 +48,14 @@ app.include_router(trust_router, prefix="/api/v1", tags=["trust"])
 app.include_router(agent_templates.router, prefix="/api/v1", tags=["agent_templates"])
 app.include_router(replay.router, prefix="/api/v1", tags=["replay"])
 app.include_router(analytics.router, prefix="/api/v1", tags=["analytics"])
+app.include_router(predictions.router, prefix="/api/v1", tags=["predictions"])
+
 @app.on_event("startup")
 async def start_failure_detection():
     import asyncio
     from .services.failure_engine import run_detection_cycle
     from .db.session import SessionLocal
+
     async def detection_loop():
         while True:
             try:
@@ -53,7 +70,9 @@ async def start_failure_detection():
             except Exception as e:
                 print(f"Failure detection error: {e}")
             await asyncio.sleep(5)
+
     asyncio.create_task(detection_loop())
+
 @app.get("/api/v1/ping")
 async def ping():
     return {"msg": "pong"}

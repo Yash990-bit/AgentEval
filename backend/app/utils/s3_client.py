@@ -29,3 +29,16 @@ class S3Client:
         """Download a snapshot binary from the bucket."""
         resp = self.s3.get_object(Bucket=self.bucket_name, Key=key)
         return resp["Body"].read()
+
+    def upload_pickle(self, key: str, obj: any) -> None:
+        """Serialize a Python object with pickle and upload to S3."""
+        import pickle
+        pickled = pickle.dumps(obj)
+        self.s3.put_object(Bucket=self.bucket_name, Key=key, Body=pickled)
+
+    def download_pickle(self, key: str) -> any:
+        """Download a pickled object from S3 and deserialize it."""
+        import pickle
+        resp = self.s3.get_object(Bucket=self.bucket_name, Key=key)
+        data = resp["Body"].read()
+        return pickle.loads(data)

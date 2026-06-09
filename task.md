@@ -1,0 +1,17 @@
+- [ ] Add backend dependencies (`scikit-learn`, `pandas`, `joblib`, `boto3`, `celery[redis]`)
+- [ ] Create `backend/app/services/prediction_engine.py`
+- [ ] Create `backend/app/services/feature_extractor.py`
+- [ ] Create `backend/app/models/prediction_models.py`
+- [ ] Create `backend/app/utils/redis_cache.py`
+- [ ] Add `backend/app/api/v1/predictions.py` router
+- [ ] Update `backend/app/api/v1/simulation.py` to include new router
+- [ ] Create Celery task `backend/app/tasks/train_prediction_models.py`
+- [ ] Add Celery beat schedule in `backend/celeryconfig.py`
+- [ ] Add unit tests under `backend/tests/`
+- [ ] Create frontend component `frontend/src/components/PredictionPanel.tsx`
+- [ ] Create frontend API helper `frontend/src/api/predictionApi.ts`
+- [ ] Integrate `PredictionPanel` into main simulation page
+- [ ] Add Tailwind glass‑morphism utilities (extend `tailwind.config.js`)
+- [ ] Write frontend tests for `PredictionPanel`
+- [ ] Verify end‑to‑end flow (run Celery, start server, open UI)
+- [ ] Update README with setup instructions
