@@ -113,5 +113,13 @@ from app.models.failure_event import FailureEvent
 from app.models.simulation_analytics import SimulationAnalytics
 from app.models.digital_twin_template import DigitalTwinTemplate
 from app.models.simulation_snapshot import SimulationSnapshot
+from app.models.goal import AgentGoal
+from app.models.prediction import (
+    ResourceExhaustionPrediction,
+    ConflictProbabilityPrediction,
+    GoalCompletionPrediction,
+    AgentFailureRiskPrediction,
+    SimulationOutcomePrediction
+)
 
 

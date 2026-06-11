@@ -1,13 +1,13 @@
 from __future__ import annotations
 
 import uuid
-from sqlalchemy import Column, String, Integer, ForeignKey, JSON, Enum, Float
+import enum
+from sqlalchemy import Column, String, Integer, ForeignKey, JSON, Enum as SQLEnum, Float
 from sqlalchemy.dialects.postgresql import UUID, ARRAY
-from sqlalchemy.orm import declarative_base, relationship
+from sqlalchemy.orm import relationship
+from app.db.models import Base
 
-Base = declarative_base()
-
-class GoalStatusEnum(str, Enum):
+class GoalStatusEnum(str, enum.Enum):
     pending = "pending"
     in_progress = "in_progress"
     blocked = "blocked"
@@ -24,10 +24,10 @@ class AgentGoal(Base):
     description = Column(String(500), nullable=True)
     priority = Column(Integer, default=5)
     parent_goal_id = Column(UUID(as_uuid=True), ForeignKey("agent_goals.id"), nullable=True)
-    dependencies = Column(ARRAY(UUID(as_uuid=True)), nullable=True)
+    dependencies = Column(ARRAY(UUID(as_uuid=True)).with_variant(JSON, "sqlite"), nullable=True)
     deadline_tick = Column(Integer, nullable=True)
     required_resources = Column(JSON, nullable=True)  # {compute_units, api_calls, tokens}
-    status = Column(Enum(GoalStatusEnum), default=GoalStatusEnum.pending, nullable=False)
+    status = Column(SQLEnum(GoalStatusEnum), default=GoalStatusEnum.pending, nullable=False)
     progress_pct = Column(Float, default=0.0)
     started_tick = Column(Integer, nullable=True)
     completed_tick = Column(Integer, nullable=True)

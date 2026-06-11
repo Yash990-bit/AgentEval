@@ -6,3 +6,10 @@ pydantic
 python-dotenv
 qdrant-client
 python-louvain
+scikit-learn
+pandas
+joblib
+boto3
+celery[redis]
+msgpack
+deepdiff

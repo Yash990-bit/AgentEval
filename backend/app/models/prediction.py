@@ -1,7 +1,5 @@
 from sqlalchemy import Column, Integer, String, Float, DateTime, JSON
-from sqlalchemy.ext.declarative import declarative_base
-
-Base = declarative_base()
+from app.db.models import Base
 
 class ResourceExhaustionPrediction(Base):
     __tablename__ = "resource_exhaustion_predictions"

@@ -7,8 +7,8 @@ BACKEND_URL = os.getenv("REDIS_URL", "redis://localhost:6379/0")
 
 celery_app = Celery("conflict_engine", broker=BROKER_URL, backend=BACKEND_URL)
 
-# Optional: load config from a separate module if needed
-# celery_app.config_from_object("app.celery_config")
+# Optional: load config from a separate module
+celery_app.config_from_object("backend.celeryconfig")
 
-# Autodiscover tasks in the project (conflict package includes tasks)
-celery_app.autodiscover_tasks(["backend.app.conflict"])
+# Autodiscover tasks in the project (conflict and tasks packages)
+celery_app.autodiscover_tasks(["backend.app.conflict", "backend.app.tasks"])
