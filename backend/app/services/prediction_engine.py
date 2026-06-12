@@ -1,5 +1,6 @@
 # backend/app/services/prediction_engine.py
 import os
+from typing import Any, List, Dict
 import joblib
 import numpy as np
 import pandas as pd
