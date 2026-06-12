@@ -17,3 +17,5 @@ sentry-sdk
 prometheus-fastapi-instrumentator
 psycopg2-binary
 celery-prometheus-exporter
+sqlalchemy
+alembic
