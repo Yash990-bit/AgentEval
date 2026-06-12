@@ -1,0 +1,22 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.venv/
+venv/
+ENV/
+env/
+
+# Databases
+dev.db
+*.sqlite3
+
+# Node / Next.js (just in case)
+node_modules/
+.next/
+out/
+
+# OS-specific
+.DS_Store
+Thumbs.db

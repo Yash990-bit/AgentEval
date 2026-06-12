@@ -1,0 +1,37 @@
+@import "tailwindcss";
+
+:root {
+  --background: #0C0A09;
+  --foreground: #FFFFFF;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+  --color-gold-primary: var(--gold-primary);
+  --color-gold-secondary: var(--gold-secondary);
+  --color-gold-soft: var(--gold-soft);
+  --color-gold-dim: var(--gold-dim);
+  --color-text-primary: var(--text-primary);
+  --color-text-secondary: var(--text-secondary);
+  --color-text-muted: var(--text-muted);
+  --color-success: var(--success);
+  --color-danger: var(--danger);
+  --color-warning: var(--warning);
+  --color-info: var(--info);
+}
+
+body {
+  background: 
+    radial-gradient(circle at 15% 15%, rgba(139, 90, 43, 0.08) 0%, transparent 55%), 
+    radial-gradient(circle at 85% 20%, rgba(242, 125, 34, 0.06) 0%, transparent 60%), 
+    radial-gradient(circle at 50% 50%, rgba(229, 184, 58, 0.05) 0%, transparent 65%), 
+    radial-gradient(circle at 20% 80%, rgba(168, 126, 42, 0.07) 0%, transparent 60%), 
+    radial-gradient(circle at 80% 85%, rgba(224, 104, 27, 0.06) 0%, transparent 55%), 
+    var(--background);
+  color: var(--foreground);
+  font-family: 'DM Sans', Arial, Helvetica, sans-serif;
+}
+
