@@ -1,5 +1,5 @@
 import datetime
-from typing import Any
+from typing import Any, Dict, List
 from sqlalchemy.orm import Session
 from sqlalchemy import select, update, func, and_, or_
 
