@@ -1,0 +1,169 @@
+# Default values for aabs chart
+
+environment: production
+
+domain: aabs.local
+
+imageCredentials:
+  registry: docker.io
+  username: ""
+  password: ""
+
+# --- Services Configuration ---
+
+frontend:
+  replicaCount: 2
+  image:
+    repository: aabs-frontend
+    tag: latest
+    pullPolicy: IfNotPresent
+  service:
+    type: ClusterIP
+    port: 3000
+  resources:
+    limits:
+      cpu: 500m
+      memory: 256Mi
+    requests:
+      cpu: 100m
+      memory: 128Mi
+
+backend:
+  replicaCount: 3
+  image:
+    repository: aabs-backend
+    tag: latest
+    pullPolicy: IfNotPresent
+  service:
+    type: ClusterIP
+    port: 8000
+  resources:
+    limits:
+      cpu: 1000m
+      memory: 512Mi
+    requests:
+      cpu: 200m
+      memory: 256Mi
+
+worker:
+  replicaCount: 3
+  image:
+    repository: aabs-worker
+    tag: latest
+    pullPolicy: IfNotPresent
+  resources:
+    limits:
+      cpu: 1000m
+      memory: 1024Mi
+    requests:
+      cpu: 500m
+      memory: 512Mi
+
+beat:
+  replicaCount: 1
+  image:
+    repository: aabs-worker
+    tag: latest
+    pullPolicy: IfNotPresent
+  resources:
+    limits:
+      cpu: 250m
+      memory: 256Mi
+    requests:
+      cpu: 100m
+      memory: 128Mi
+
+# --- Stateful Infrastructure ---
+
+postgres:
+  image:
+    repository: postgres
+    tag: 15-alpine
+    pullPolicy: IfNotPresent
+  port: 5432
+  storageSize: 10Gi
+  resources:
+    limits:
+      cpu: 1000m
+      memory: 1024Mi
+    requests:
+      cpu: 500m
+      memory: 512Mi
+  auth:
+    database: simulator
+    username: postgres
+    password: securepostgrespassword
+
+redis:
+  image:
+    repository: redis
+    tag: 7-alpine
+    pullPolicy: IfNotPresent
+  port: 6379
+  storageSize: 5Gi
+  resources:
+    limits:
+      cpu: 500m
+      memory: 512Mi
+    requests:
+      cpu: 200m
+      memory: 256Mi
+
+qdrant:
+  image:
+    repository: qdrant/qdrant
+    tag: latest
+    pullPolicy: IfNotPresent
+  port: 6333
+  storageSize: 10Gi
+  resources:
+    limits:
+      cpu: 1000m
+      memory: 1024Mi
+    requests:
+      cpu: 500m
+      memory: 512Mi
+
+minio:
+  image:
+    repository: minio/minio
+    tag: latest
+    pullPolicy: IfNotPresent
+  port: 9000
+  consolePort: 9001
+  storageSize: 20Gi
+  resources:
+    limits:
+      cpu: 500m
+      memory: 512Mi
+    requests:
+      cpu: 250m
+      memory: 256Mi
+  auth:
+    rootUser: minioadmin
+    rootPassword: secureminiopassword
+
+# --- Ingress Config ---
+ingress:
+  enabled: true
+  className: nginx
+  annotations:
+    kubernetes.io/ingress.class: nginx
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+  hosts:
+    - host: aabs.local
+      paths:
+        - path: /
+          pathType: Prefix
+  tls:
+    - secretName: aabs-tls
+      hosts:
+        - aabs.local
+
+# --- Credentials & Settings ---
+sentry:
+  dsn: ""
+  org: "agentverse"
+  project: "aabs"
+  authToken: ""

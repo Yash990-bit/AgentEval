@@ -23,7 +23,7 @@ FROM python:3.11-slim
 
 WORKDIR /app
 
-# Install runtime dependencies (e.g. libpq, curl for healthcheck)
+# Install runtime dependencies (e.g. libpq, curl/celery inspect for healthcheck)
 RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
     libpq5 \
@@ -41,10 +41,8 @@ RUN useradd -u 10001 -m appuser && \
     chown -R appuser:appuser /app
 USER appuser
 
-EXPOSE 8000
+# Healthcheck for Celery worker
+HEALTHCHECK --interval=30s --timeout=10s --start-period=10s --retries=3 \
+  CMD celery -A app.celery_app inspect ping || exit 1
 
-# Healthcheck
-HEALTHCHECK --interval=30s --timeout=5s --start-period=5s --retries=3 \
-  CMD curl -f http://localhost:8000/api/v1/health || exit 1
-
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["celery", "-A", "app.celery_app", "worker", "--loglevel=info"]

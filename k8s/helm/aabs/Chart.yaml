@@ -1,0 +1,7 @@
+apiVersion: v2
+name: aabs
+description: A Helm chart for Kubernetes deployment of the AI Agent Behavior Simulator (AABS)
+type: application
+version: 1.0.0
+appVersion: "1.0.0"
+dependencies: []

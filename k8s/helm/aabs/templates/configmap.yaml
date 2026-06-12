@@ -1,0 +1,21 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ .Release.Name }}-config
+  labels:
+    app: aabs
+data:
+  ENV: "{{ .Values.environment }}"
+  NODE_ENV: "{{ .Values.environment }}"
+  REDIS_URL: "redis://{{ .Release.Name }}-redis:6379/0"
+  QDRANT_HOST: "{{ .Release.Name }}-qdrant"
+  QDRANT_PORT: "6333"
+  S3_ENDPOINT: "http://{{ .Release.Name }}-minio:9000"
+  S3_BUCKET: "agentverse-snapshots"
+  AWS_REGION: "us-east-1"
+  SENTRY_ORG: "{{ .Values.sentry.org }}"
+  SENTRY_PROJECT: "{{ .Values.sentry.project }}"
+  SENTRY_TRACES_SAMPLE_RATE: "0.1"
+  POSTGRES_HOST: "{{ .Release.Name }}-postgres"
+  POSTGRES_DB: "{{ .Values.postgres.auth.database }}"
+  POSTGRES_USER: "{{ .Values.postgres.auth.username }}"

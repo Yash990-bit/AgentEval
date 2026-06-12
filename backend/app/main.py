@@ -1,5 +1,23 @@
+import os
+import sentry_sdk
+from sentry_sdk.integrations.fastapi import FastApiIntegration
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from prometheus_fastapi_instrumentator import Instrumentator
+from .utils.logging_setup import setup_structured_logging, StructuredLoggingMiddleware
+
+# Initialize Sentry
+SENTRY_DSN = os.getenv("SENTRY_DSN")
+if SENTRY_DSN:
+    sentry_sdk.init(
+        dsn=SENTRY_DSN,
+        integrations=[FastApiIntegration()],
+        traces_sample_rate=float(os.getenv("SENTRY_TRACES_SAMPLE_RATE", "0.1")),
+        environment=os.getenv("ENV", "production")
+    )
+
+# Setup structured logging
+setup_structured_logging()
 
 # Import API routers
 from .api.v1 import (
@@ -21,6 +39,12 @@ from .api.v1.conflicts import router as conflicts_router
 """FastAPI application entry point with all API routers, including predictions."""
 
 app = FastAPI(title="AI Agent Behaviour Simulator", version="0.1.0")
+
+# Instrument FastAPI with Prometheus metrics
+Instrumentator().instrument(app).expose(app, endpoint="/metrics")
+
+# Add custom structured logging middleware
+app.add_middleware(StructuredLoggingMiddleware)
 
 # Wire the global SocketManager to the FastAPI app so that InteractionEngine can emit events.
 from .socket import socket_manager  # relative import from backend/app/socket.py

@@ -1,0 +1,68 @@
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ .Release.Name }}-network-policy
+  labels:
+    app: aabs
+spec:
+  podSelector:
+    matchLabels:
+      app: aabs
+  policyTypes:
+  - Ingress
+  - Egress
+  ingress:
+  # Allow traffic to frontend from external ingress controller
+  - from:
+    - namespaceSelector: {}
+      podSelector:
+        matchLabels:
+          app.kubernetes.io/component: controller
+    ports:
+    - protocol: TCP
+      port: 3000
+  # Allow traffic to backend from frontend pods
+  - from:
+    - podSelector:
+        matchLabels:
+          tier: frontend
+    ports:
+    - protocol: TCP
+      port: 8000
+  # Allow backend/workers to communicate with datastores (postgres, redis, qdrant, minio)
+  - from:
+    - podSelector:
+        matchLabels:
+          tier: backend
+    - podSelector:
+        matchLabels:
+          tier: worker
+    - podSelector:
+        matchLabels:
+          tier: beat
+    ports:
+    - protocol: TCP
+      port: 5432
+    - protocol: TCP
+      port: 6379
+    - protocol: TCP
+      port: 6333
+    - protocol: TCP
+      port: 9000
+  egress:
+  # Allow all out-of-cluster egress (DNS resolution, Sentry, Let's Encrypt verification)
+  - to:
+    ports:
+    - protocol: UDP
+      port: 53
+    - protocol: TCP
+      port: 53
+    - protocol: TCP
+      port: 443
+    - protocol: TCP
+      port: 80
+  # Allow internal pod-to-pod egress matching ingress rules
+  - to:
+    - podSelector:
+        matchLabels:
+          app: aabs

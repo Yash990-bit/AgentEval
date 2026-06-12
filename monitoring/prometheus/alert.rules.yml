@@ -1,0 +1,42 @@
+groups:
+- name: aabs-alerts
+  rules:
+  # 1. HTTP Error Rate Alert
+  - alert: HighHttpErrorRate
+    expr: rate(http_requests_total{status=~"5.."}[5m]) / rate(http_requests_total[5m]) * 100 > 5
+    for: 2m
+    labels:
+      severity: critical
+    annotations:
+      summary: "High HTTP 5xx error rate detected on backend: {{ $value | printf \"%.2f\" }}%"
+      description: "More than 5% of requests to backend are returning server errors for over 2 minutes."
+
+  # 2. HTTP Latency Alert (p95 > 2s)
+  - alert: HighLatencyP95
+    expr: histogram_quantile(0.95, sum(rate(http_request_duration_seconds_bucket[5m])) by (le)) > 2
+    for: 3m
+    labels:
+      severity: warning
+    annotations:
+      summary: "High HTTP latency detected: p95 is {{ $value }}s"
+      description: "The 95th percentile request latency exceeds 2 seconds for over 3 minutes."
+
+  # 3. Disk Space Alert (> 80%)
+  - alert: HighDiskUsage
+    expr: (node_filesystem_size_bytes - node_filesystem_free_bytes) / node_filesystem_size_bytes * 100 > 80
+    for: 5m
+    labels:
+      severity: warning
+    annotations:
+      summary: "High disk usage on host: {{ $value | printf \"%.2f\" }}%"
+      description: "Available disk space is below 20% on target host for over 5 minutes."
+
+  # 4. Celery Queue Depth Alert (> 100 tasks)
+  - alert: CeleryQueueBacklog
+    expr: celery_queue_length > 100
+    for: 5m
+    labels:
+      severity: warning
+    annotations:
+      summary: "Celery task queue backing up: {{ $value }} pending tasks"
+      description: "The Celery task queue depth has remained over 100 tasks for more than 5 minutes."
