@@ -4,7 +4,7 @@ from qdrant_client import QdrantClient
 from qdrant_client.http.models import Distance, VectorParams, Filter, FieldCondition, MatchValue, PointStruct
 from pydantic import BaseModel
 
-from ..config import QDRANT_HOST, QDRANT_PORT, QDRANT_COLLECTION
+from ..config import QDRANT_HOST, QDRANT_PORT, QDRANT_COLLECTION, QDRANT_URL, QDRANT_API_KEY
 
 class LTMItem(BaseModel):
     content: str
@@ -22,7 +22,10 @@ class LongTermMemory:
         self.collection_name = collection_name
         self.dim = dim
         try:
-            self.client = QdrantClient(host=QDRANT_HOST, port=QDRANT_PORT, timeout=1.0)
+            if QDRANT_URL:
+                self.client = QdrantClient(url=QDRANT_URL, api_key=QDRANT_API_KEY, timeout=1.0)
+            else:
+                self.client = QdrantClient(host=QDRANT_HOST, port=QDRANT_PORT, api_key=QDRANT_API_KEY, timeout=1.0)
             # Test connectivity
             self.client.get_collections()
         except Exception:
