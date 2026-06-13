@@ -1,16 +1,41 @@
 "use client";
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import axios from 'axios';
 import { Bot, CheckCircle2, AlertOctagon } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { GlassCard } from '@/components/ui/GlassCard';
 import { GoldButton } from '@/components/ui/GoldButton';
-import { mockAgents as initialAgents } from '@/lib/mockData';
 
 export default function AgentManagementPage() {
-  const [agents, setAgents] = useState(
-    initialAgents.map(a => ({ ...a, active: true }))
-  );
+  const [agents, setAgents] = useState<any[]>([]);
   const [notification, setNotification] = useState<string | null>(null);
+
+  const fetchAgents = async () => {
+    try {
+      const res = await axios.get('/api/v1/agents');
+      setAgents(res.data.map((a: any) => ({
+        id: a.id,
+        name: a.name,
+        role: a.role,
+        description: a.description || a.objective,
+        status: a.status,
+        trust: a.trust_score,
+        energy: a.energy_score,
+        risk: a.risk_score,
+        goalsCompleted: a.goals_completed,
+        messagesSent: a.messages_sent,
+        conflictsInvolved: a.conflicts_involved,
+        tokensUsed: a.tokens_used,
+        active: a.status !== 'failed'
+      })));
+    } catch (err) {
+      console.error("Failed to load agents in management view", err);
+    }
+  };
+
+  useEffect(() => {
+    fetchAgents();
+  }, []);
 
   const toggleAgent = (id: string, name: string, active: boolean) => {
     setAgents(prev =>

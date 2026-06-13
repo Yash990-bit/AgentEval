@@ -1,0 +1,38 @@
+# Render Blueprint Specification for AABS Production
+# This file automates the creation of all services and ensures they build and start on git push.
+
+services:
+  # 1. Backend FastAPI Service
+  - type: web
+    name: agenteval-backend
+    env: docker
+    dockerfilePath: backend/Dockerfile
+    dockerContext: backend
+    plan: starter
+    startCommand: uvicorn app.main:app --host 0.0.0.0 --port 8000
+    envVars:
+      - key: ENV
+        value: production
+      - key: SENTRY_DSN
+        sync: false
+      - key: SENTRY_TRACES_SAMPLE_RATE
+        value: "0.1"
+      - key: DATABASE_URL
+        sync: false # Set in Render Dashboard or link to Render Postgres
+      - key: REDIS_URL
+        sync: false # Set in Render Dashboard or link to Render Redis
+
+  # 2. Celery Async Task Worker
+  - type: worker
+    name: agenteval-worker
+    env: docker
+    dockerfilePath: worker/Dockerfile
+    dockerContext: .
+    plan: starter
+    envVars:
+      - key: ENV
+        value: production
+      - key: DATABASE_URL
+        sync: false
+      - key: REDIS_URL
+        sync: false

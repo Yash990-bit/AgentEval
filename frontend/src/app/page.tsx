@@ -1,5 +1,6 @@
 "use client";
 import React, { useState, useEffect, useRef, useMemo } from 'react';
+import axios from 'axios';
 import { create } from 'zustand';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
@@ -238,6 +239,8 @@ interface Store {
   addSimulation: (sim: Simulation) => void;
   addApiKey: (key: any) => void;
   revokeApiKey: (id: string) => void;
+  setAgents: (agents: Agent[]) => void;
+  fetchAgents: () => Promise<void>;
   addMember: (member: any) => void;
 }
 
@@ -331,6 +334,29 @@ const useStore = create<Store>((set) => ({
   revokeApiKey: (id) => set((state) => ({
     apiKeys: state.apiKeys.map(k => k.id === id ? { ...k, status: 'revoked' } : k)
   })),
+  setAgents: (agents) => set({ agents }),
+  fetchAgents: async () => {
+    try {
+      const response = await axios.get('/api/v1/agents');
+      const apiAgents = response.data.map((a: any) => ({
+        id: a.id,
+        name: a.name,
+        role: a.role,
+        description: a.description || a.objective,
+        status: a.status,
+        trust: a.trust_score,
+        energy: a.energy_score,
+        risk: a.risk_score,
+        goalsCompleted: a.goals_completed,
+        messagesSent: a.messages_sent,
+        conflictsInvolved: a.conflicts_involved,
+        tokensUsed: a.tokens_used
+      }));
+      set({ agents: apiAgents });
+    } catch (err) {
+      console.error("Failed to fetch agents", err);
+    }
+  },
   addMember: (member) => set((state) => ({ members: [...state.members, member] }))
 }));
 
@@ -2021,6 +2047,10 @@ const SettingsPage: React.FC = () => {
    ========================================================================= */
 export default function AgentVerseApp() {
   const store = useStore();
+
+  useEffect(() => {
+    store.fetchAgents();
+  }, []);
 
   return (
     <>
