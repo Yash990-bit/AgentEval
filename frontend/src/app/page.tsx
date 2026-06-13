@@ -225,6 +225,7 @@ interface Store {
   apiKeys: any[];
   auditLogs: any[];
   workspaces: any[];
+  members: any[];
   setCurrentPage: (page: string) => void;
   setSidebarOpen: (open: boolean) => void;
   setSelectedSimulationId: (id: string) => void;
@@ -237,6 +238,7 @@ interface Store {
   addSimulation: (sim: Simulation) => void;
   addApiKey: (key: any) => void;
   revokeApiKey: (id: string) => void;
+  addMember: (member: any) => void;
 }
 
 const useStore = create<Store>((set) => ({
@@ -306,6 +308,9 @@ const useStore = create<Store>((set) => ({
     { id: 'w-2', name: 'Fintech Simulation Desk', members: 6, simulations: 3 },
     { id: 'w-3', name: 'General Sandboxes', members: 2, simulations: 12 }
   ],
+  members: [
+    { id: 'm-1', name: 'Yash Raghubanshi (You)', role: 'Owner', lastActive: 'Active Now' }
+  ],
   setCurrentPage: (page) => set({ currentPage: page }),
   setSidebarOpen: (open) => set({ sidebarOpen: open }),
   setSelectedSimulationId: (id) => set({ selectedSimulationId: id }),
@@ -325,7 +330,8 @@ const useStore = create<Store>((set) => ({
   addApiKey: (key) => set((state) => ({ apiKeys: [key, ...state.apiKeys] })),
   revokeApiKey: (id) => set((state) => ({
     apiKeys: state.apiKeys.map(k => k.id === id ? { ...k, status: 'revoked' } : k)
-  }))
+  })),
+  addMember: (member) => set((state) => ({ members: [...state.members, member] }))
 }));
 
 /* =========================================================================
@@ -1824,10 +1830,23 @@ const SettingsPage: React.FC = () => {
       lastUsed: 'Never',
       requests: '0',
       status: 'active',
-      value: `sk_live_${Math.random().toString(36).substr(2, 8)}`
+      value: `sk_live_${Math.random().toString(36).substring(2, 10)}${Math.random().toString(36).substring(2, 10)}`
     };
     store.addApiKey(newKey);
+    alert(`API Observability Credentials Created!\n\nName: ${newKey.name}\nKey Value: ${newKey.value}\n\nPlease copy this key now. It will not be shown again.`);
     setNewKeyName('');
+  };
+
+  const handleInviteMember = () => {
+    if (!inviteEmail.trim()) return;
+    const newMember = {
+      id: `member-${Date.now()}`,
+      name: inviteEmail,
+      role: inviteRole === 'admin' ? 'Swarm Admin' : 'Swarm Member',
+      lastActive: 'Invited'
+    };
+    store.addMember(newMember);
+    setInviteEmail('');
   };
 
   return (
@@ -1874,7 +1893,7 @@ const SettingsPage: React.FC = () => {
                     <option value="member">Swarm Member</option>
                     <option value="admin">Swarm Admin</option>
                   </select>
-                  <GoldButton onClick={() => { alert(`Invite dispatched to: ${inviteEmail}`); setInviteEmail(''); }}>
+                  <GoldButton onClick={handleInviteMember}>
                     Invite
                   </GoldButton>
                 </div>
@@ -1892,11 +1911,15 @@ const SettingsPage: React.FC = () => {
                     </tr>
                   </thead>
                   <tbody>
-                    <tr className="border-b border-white/5">
-                      <td className="py-3 font-semibold text-white font-ui">Yash Raghubanshi (You)</td>
-                      <td className="py-3 text-gold-secondary">Owner</td>
-                      <td className="py-3 text-success">Active Now</td>
-                    </tr>
+                    {store.members.map((m) => (
+                      <tr key={m.id} className="border-b border-white/5">
+                        <td className="py-3 font-semibold text-white font-ui">{m.name}</td>
+                        <td className="py-3 text-gold-secondary">{m.role}</td>
+                        <td className={`py-3 ${m.lastActive === 'Active Now' ? 'text-success' : 'text-gray-500'}`}>
+                          {m.lastActive}
+                        </td>
+                      </tr>
+                    ))}
                   </tbody>
                 </table>
               </div>
