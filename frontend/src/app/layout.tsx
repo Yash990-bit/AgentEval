@@ -14,7 +14,7 @@ if (typeof window !== 'undefined') {
     apiBase = apiBase.replace(/\/api\/v1\/?$/, '').replace(/\/api\/?$/, '').replace(/\/$/, '');
     axios.defaults.baseURL = apiBase;
   } else if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
-    axios.defaults.baseURL = 'http://localhost:8000';
+    axios.defaults.baseURL = `http://${window.location.hostname}:8000`;
   }
 }
 
