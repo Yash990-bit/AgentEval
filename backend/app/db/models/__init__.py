@@ -122,4 +122,24 @@ from app.models.prediction import (
     SimulationOutcomePrediction
 )
 
+class ApiKeyModel(Base):
+    __tablename__ = "api_keys"
+
+    id = Column(String(50), primary_key=True)
+    name = Column(String(100), nullable=False)
+    scopes = Column(String(50), nullable=False, default="read/write")
+    created = Column(String(50), nullable=False)
+    last_used = Column(String(50), nullable=False, default="Never")
+    requests = Column(String(50), nullable=False, default="0")
+    status = Column(String(20), nullable=False, default="active")
+    value = Column(String(100), nullable=False, unique=True)
+
+class MemberModel(Base):
+    __tablename__ = "members"
+
+    id = Column(String(50), primary_key=True)
+    name = Column(String(100), nullable=False)
+    role = Column(String(50), nullable=False)
+    last_active = Column(String(50), nullable=False, default="Invited")
+
 

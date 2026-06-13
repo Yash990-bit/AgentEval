@@ -32,6 +32,7 @@ from .api.v1 import (
     replay,
     analytics,
     predictions,
+    settings,
 )
 from .api.v1.trust import router as trust_router
 from .api.v1.conflicts import router as conflicts_router
@@ -73,6 +74,7 @@ app.include_router(agent_templates.router, prefix="/api/v1", tags=["agent_templa
 app.include_router(replay.router, prefix="/api/v1", tags=["replay"])
 app.include_router(analytics.router, prefix="/api/v1", tags=["analytics"])
 app.include_router(predictions.router, prefix="/api/v1", tags=["predictions"])
+app.include_router(settings.router, prefix="/api/v1", tags=["settings"])
 
 @app.on_event("startup")
 async def start_failure_detection():

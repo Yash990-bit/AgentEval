@@ -1,4 +1,3 @@
-'''python
 """alembic revision to create digital_twin_templates table"""
 
 from alembic import op
@@ -7,9 +6,9 @@ import sqlalchemy.dialects.postgresql as pg
 
 # revision identifiers, used by Alembic.
 revision = "20260608_create_digital_twin_templates"
- down_revision = None
- branch_labels = None
- depends_on = None
+down_revision = None
+branch_labels = None
+depends_on = None
 
 def upgrade():
     op.create_table(
@@ -39,4 +38,3 @@ def upgrade():
 
 def downgrade():
     op.drop_table("digital_twin_templates")
-'''

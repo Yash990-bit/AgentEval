@@ -242,6 +242,8 @@ interface Store {
   setAgents: (agents: Agent[]) => void;
   fetchAgents: () => Promise<void>;
   addMember: (member: any) => void;
+  fetchKeys: () => Promise<void>;
+  fetchMembers: () => Promise<void>;
 }
 
 const useStore = create<Store>((set) => ({
@@ -296,11 +298,7 @@ const useStore = create<Store>((set) => ({
   playbackTick: 47,
   playbackRunning: false,
   playbackSpeed: 1,
-  apiKeys: [
-    { id: 'key-1', name: 'Gemini Production Key', scopes: 'read/write', created: '2026-05-10', lastUsed: '3m ago', requests: '1.2M', status: 'active', value: 'sk_live_gemini7482hsa0' },
-    { id: 'key-2', name: 'OpenAI Observability ReadOnly', scopes: 'read-only', created: '2026-05-12', lastUsed: '1h ago', requests: '430k', status: 'active', value: 'sk_live_openaiajs8291n' },
-    { id: 'key-3', name: 'Legacy Test Token', scopes: 'admin', created: '2026-04-01', lastUsed: '12d ago', requests: '12k', status: 'revoked', value: 'sk_test_legacytoken839' }
-  ],
+  apiKeys: [],
   auditLogs: [
     { id: 'log-1', timestamp: '2026-06-11 15:30:12', user: 'yash@google.com', action: 'CREATE', resource: 'Simulation Studio Scenario', ip: '10.229.12.98', details: 'Added simulated conflict rules threshold' },
     { id: 'log-2', timestamp: '2026-06-11 15:28:44', user: 'yash@google.com', action: 'UPDATE', resource: 'Agent ARIA-7 Config', ip: '10.229.12.98', details: 'Adjusted default memory decay parameter from 0.05 to 0.08' },
@@ -311,9 +309,7 @@ const useStore = create<Store>((set) => ({
     { id: 'w-2', name: 'Fintech Simulation Desk', members: 6, simulations: 3 },
     { id: 'w-3', name: 'General Sandboxes', members: 2, simulations: 12 }
   ],
-  members: [
-    { id: 'm-1', name: 'Yash Raghubanshi (You)', role: 'Owner', lastActive: 'Active Now' }
-  ],
+  members: [],
   setCurrentPage: (page) => set({ currentPage: page }),
   setSidebarOpen: (open) => set({ sidebarOpen: open }),
   setSelectedSimulationId: (id) => set({ selectedSimulationId: id }),
@@ -330,10 +326,34 @@ const useStore = create<Store>((set) => ({
   setPlaybackRunning: (running) => set({ playbackRunning: running }),
   setPlaybackSpeed: (speed) => set({ playbackSpeed: speed }),
   addSimulation: (sim) => set((state) => ({ activeSimulations: [sim, ...state.activeSimulations] })),
-  addApiKey: (key) => set((state) => ({ apiKeys: [key, ...state.apiKeys] })),
-  revokeApiKey: (id) => set((state) => ({
-    apiKeys: state.apiKeys.map(k => k.id === id ? { ...k, status: 'revoked' } : k)
-  })),
+  addApiKey: async (key) => {
+    try {
+      const payload = {
+        id: key.id,
+        name: key.name,
+        scopes: key.scopes,
+        created: key.created,
+        last_used: key.lastUsed,
+        requests: key.requests,
+        status: key.status,
+        value: key.value
+      };
+      const response = await axios.post('/api/v1/settings/keys', payload);
+      set((state) => ({ apiKeys: [response.data, ...state.apiKeys] }));
+    } catch (err) {
+      console.error("Failed to add api key", err);
+    }
+  },
+  revokeApiKey: async (id) => {
+    try {
+      const response = await axios.put(`/api/v1/settings/keys/${id}/revoke`);
+      set((state) => ({
+        apiKeys: state.apiKeys.map(k => k.id === id ? response.data : k)
+      }));
+    } catch (err) {
+      console.error("Failed to revoke api key", err);
+    }
+  },
   setAgents: (agents) => set({ agents }),
   fetchAgents: async () => {
     try {
@@ -357,7 +377,36 @@ const useStore = create<Store>((set) => ({
       console.error("Failed to fetch agents", err);
     }
   },
-  addMember: (member) => set((state) => ({ members: [...state.members, member] }))
+  addMember: async (member) => {
+    try {
+      const payload = {
+        id: member.id,
+        name: member.name,
+        role: member.role,
+        last_active: member.lastActive
+      };
+      const response = await axios.post('/api/v1/settings/members', payload);
+      set((state) => ({ members: [...state.members, response.data] }));
+    } catch (err) {
+      console.error("Failed to add member", err);
+    }
+  },
+  fetchKeys: async () => {
+    try {
+      const response = await axios.get('/api/v1/settings/keys');
+      set({ apiKeys: response.data });
+    } catch (err) {
+      console.error("Failed to fetch keys", err);
+    }
+  },
+  fetchMembers: async () => {
+    try {
+      const response = await axios.get('/api/v1/settings/members');
+      set({ members: response.data });
+    } catch (err) {
+      console.error("Failed to fetch members", err);
+    }
+  }
 }));
 
 /* =========================================================================
@@ -2050,6 +2099,8 @@ export default function AgentVerseApp() {
 
   useEffect(() => {
     store.fetchAgents();
+    store.fetchKeys();
+    store.fetchMembers();
   }, []);
 
   return (
