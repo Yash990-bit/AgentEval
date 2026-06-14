@@ -244,6 +244,7 @@ interface Store {
   addMember: (member: any) => void;
   fetchKeys: () => Promise<void>;
   fetchMembers: () => Promise<void>;
+  addAgent: (agent: any) => Promise<void>;
 }
 
 const useStore = create<Store>((set) => ({
@@ -405,6 +406,37 @@ const useStore = create<Store>((set) => ({
       set({ members: response.data });
     } catch (err) {
       console.error("Failed to fetch members", err);
+    }
+  },
+  addAgent: async (agent) => {
+    try {
+      const response = await axios.post('/api/v1/agents', {
+        name: agent.name,
+        role: agent.role,
+        objective: agent.objective,
+        description: agent.description,
+        status: agent.status || 'idle',
+        trust_score: agent.trust !== undefined ? agent.trust : 1.0,
+        energy_score: agent.energy !== undefined ? agent.energy : 1.0,
+        risk_score: agent.risk !== undefined ? agent.risk : 0.0
+      });
+      const newAgent = {
+        id: response.data.id,
+        name: response.data.name,
+        role: response.data.role,
+        description: response.data.description || response.data.objective,
+        status: response.data.status,
+        trust: response.data.trust_score,
+        energy: response.data.energy_score,
+        risk: response.data.risk_score,
+        goalsCompleted: response.data.goals_completed,
+        messagesSent: response.data.messages_sent,
+        conflictsInvolved: response.data.conflicts_involved,
+        tokensUsed: response.data.tokens_used
+      };
+      set((state) => ({ agents: [...state.agents, newAgent] }));
+    } catch (err) {
+      console.error("Failed to add agent", err);
     }
   }
 }));
@@ -992,9 +1024,9 @@ const SimulationStudioPage: React.FC = () => {
           )}
 
           {activeTab === 'agents' && (
-            <div className="space-y-3">
-              <p className="text-[11px] text-text-muted">Drag templates to canvas or tap Add.</p>
-              {store.agents.slice(0, 4).map(a => (
+            <div className="space-y-3 max-h-[400px] overflow-y-auto pr-1">
+              <p className="text-[11px] text-text-muted">Select templates from the swarm to add to canvas.</p>
+              {store.agents.map(a => (
                 <div key={a.id} className="p-3 bg-black/60 border border-gold-primary/10 rounded-lg flex items-center justify-between">
                   <div>
                     <h5 className="font-semibold text-white text-xs">{a.name}</h5>
@@ -1110,8 +1142,18 @@ const SimulationStudioPage: React.FC = () => {
               key={n.id}
               style={{ left: n.x, top: n.y, width: '130px', position: 'absolute' }}
               onMouseDown={() => setDraggingNodeId(n.id)}
-              className="glass-card bg-black/90 rounded border border-gold-primary/30 p-2 text-center select-none cursor-move hover:border-gold-secondary transition-all"
+              className="glass-card bg-black/90 rounded border border-gold-primary/30 p-2 text-center select-none cursor-move hover:border-gold-secondary transition-all group/node"
             >
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setNodes(prev => prev.filter(node => node.id !== n.id));
+                  setEdges(prev => prev.filter(edge => edge.source !== n.id && edge.target !== n.id));
+                }}
+                className="absolute top-1 right-1 w-4 h-4 rounded-full bg-red-500/20 hover:bg-red-600 text-white flex items-center justify-center text-[8px] opacity-0 group-hover/node:opacity-100 transition-opacity"
+              >
+                ✕
+              </button>
               <AgentAvatar role={n.role} size={24} className="mx-auto mb-1" />
               <h5 className="text-[10px] font-mono font-bold text-white">{n.name}</h5>
               <span className="text-[8px] text-text-muted uppercase tracking-wider">{n.role}</span>
@@ -1135,6 +1177,13 @@ const AgentManagementPage: React.FC = () => {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [drawerTab, setDrawerTab] = useState<'overview' | 'memory' | 'goals' | 'evaluations'>('overview');
 
+  // Creation states
+  const [createOpen, setCreateOpen] = useState(false);
+  const [newAgentName, setNewAgentName] = useState('');
+  const [newAgentRole, setNewAgentRole] = useState('Researcher');
+  const [newAgentObjective, setNewAgentObjective] = useState('');
+  const [newAgentDescription, setNewAgentDescription] = useState('');
+
   const selectedAgent = store.agents.find(a => a.id === store.selectedAgentId) || store.agents[0];
 
   const filteredAgents = store.agents.filter(a => {
@@ -1142,6 +1191,24 @@ const AgentManagementPage: React.FC = () => {
     const matchSearch = a.name.toLowerCase().includes(search.toLowerCase()) || a.role.toLowerCase().includes(search.toLowerCase());
     return matchFilter && matchSearch;
   });
+
+  const handleCreateAgent = async () => {
+    if (!newAgentName.trim() || !newAgentObjective.trim()) return;
+    await store.addAgent({
+      name: newAgentName,
+      role: newAgentRole,
+      objective: newAgentObjective,
+      description: newAgentDescription || newAgentObjective,
+      trust: 0.90,
+      energy: 0.90,
+      risk: 0.05
+    });
+    setNewAgentName('');
+    setNewAgentRole('Researcher');
+    setNewAgentObjective('');
+    setNewAgentDescription('');
+    setCreateOpen(false);
+  };
 
   return (
     <div className="space-y-6 relative overflow-hidden min-h-[calc(100vh-120px)]">
@@ -1174,6 +1241,9 @@ const AgentManagementPage: React.FC = () => {
               className="bg-black/60 border border-gold-primary/20 rounded pl-8 pr-3 py-1.5 text-xs text-white focus:outline-none w-full md:w-48"
             />
           </div>
+          <GoldButton onClick={() => setCreateOpen(true)} className="flex items-center gap-1 py-1.5 text-xs">
+            <Plus size={14} /> Create Agent
+          </GoldButton>
         </div>
       </div>
 
@@ -1402,6 +1472,97 @@ const AgentManagementPage: React.FC = () => {
                     </div>
                   </div>
                 )}
+              </div>
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
+
+      {/* Create Agent Drawer (Slides from right) */}
+      <AnimatePresence>
+        {createOpen && (
+          <>
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 0.5 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setCreateOpen(false)}
+              className="fixed inset-0 bg-black z-40"
+            />
+            <motion.div
+              initial={{ x: '100%' }}
+              animate={{ x: 0 }}
+              exit={{ x: '100%' }}
+              transition={{ type: 'spring', damping: 20 }}
+              className="fixed right-0 top-0 bottom-0 w-full md:w-[480px] bg-[#121212] border-l border-gold-primary/25 z-50 p-6 flex flex-col gap-6 shadow-[0_0_40px_rgba(0,0,0,0.8)]"
+            >
+              <div className="flex justify-between items-center">
+                <h3 className="font-display text-xl font-bold text-gold-primary">Create Swarm Agent</h3>
+                <button onClick={() => setCreateOpen(false)} className="text-text-secondary hover:text-white">
+                  <X size={20} />
+                </button>
+              </div>
+
+              <div className="flex-1 overflow-y-auto space-y-4 pr-1 text-xs font-ui">
+                <div>
+                  <label className="text-text-secondary block mb-1 font-semibold">Agent Name</label>
+                  <input
+                    type="text"
+                    placeholder="e.g. ARIA-7, NEXUS-3, CLAUDE-4"
+                    value={newAgentName}
+                    onChange={(e) => setNewAgentName(e.target.value)}
+                    className="w-full bg-black/60 border border-gold-primary/20 rounded px-3 py-2 text-white focus:outline-none focus:ring-1 focus:ring-gold-primary"
+                  />
+                </div>
+
+                <div>
+                  <label className="text-text-secondary block mb-1 font-semibold">Workspace Role</label>
+                  <select
+                    value={newAgentRole}
+                    onChange={(e) => setNewAgentRole(e.target.value)}
+                    className="w-full bg-black/60 border border-gold-primary/20 rounded px-3 py-2 text-white focus:outline-none focus:ring-1 focus:ring-gold-primary"
+                  >
+                    <option value="Coordinator">Coordinator</option>
+                    <option value="Researcher">Researcher</option>
+                    <option value="Analyst">Analyst</option>
+                    <option value="Planner">Planner</option>
+                    <option value="Executor">Executor</option>
+                    <option value="Support">Support</option>
+                    <option value="Negotiator">Negotiator</option>
+                    <option value="Security Auditor">Security Auditor</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="text-text-secondary block mb-1 font-semibold">Agent Objective</label>
+                  <textarea
+                    rows={3}
+                    placeholder="What is this agent's core task or system objective?"
+                    value={newAgentObjective}
+                    onChange={(e) => setNewAgentObjective(e.target.value)}
+                    className="w-full bg-black/60 border border-gold-primary/20 rounded px-3 py-2 text-white focus:outline-none focus:ring-1 focus:ring-gold-primary"
+                  />
+                </div>
+
+                <div>
+                  <label className="text-text-secondary block mb-1 font-semibold">Detailed Description (Optional)</label>
+                  <textarea
+                    rows={3}
+                    placeholder="Additional context or capabilities..."
+                    value={newAgentDescription}
+                    onChange={(e) => setNewAgentDescription(e.target.value)}
+                    className="w-full bg-black/60 border border-gold-primary/20 rounded px-3 py-2 text-white focus:outline-none focus:ring-1 focus:ring-gold-primary"
+                  />
+                </div>
+              </div>
+
+              <div className="border-t border-gold-primary/10 pt-4 flex gap-3">
+                <GoldButton className="flex-1" onClick={handleCreateAgent}>
+                  Create Agent
+                </GoldButton>
+                <GoldButton variant="outline" onClick={() => setCreateOpen(false)}>
+                  Cancel
+                </GoldButton>
               </div>
             </motion.div>
           </>
