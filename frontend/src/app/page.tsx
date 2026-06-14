@@ -603,7 +603,7 @@ const useCountUp = (target: number, duration: number = 1500) => {
         clearInterval(timer);
         setVal(end);
       } else {
-        setVal(Math.floor(start));
+        setVal(Number.isInteger(end) ? Math.floor(start) : parseFloat(start.toFixed(2)));
       }
     }, incrementTime);
 
@@ -622,8 +622,8 @@ const MetricCard: React.FC<{
   isRate?: boolean;
   isToken?: boolean;
 }> = ({ label, value, icon: Icon, accent, isRate = false, isToken = false }) => {
-  const count = useCountUp(isRate ? 94 : isToken ? 2.4 : value);
-  const formattedVal = isRate ? `${count}.2%` : isToken ? `${count.toFixed(1)}M` : count;
+  const count = useCountUp(value);
+  const formattedVal = isRate ? `${count.toFixed(1)}%` : isToken ? `${count.toFixed(1)}M` : count;
 
   return (
     <GlassCard className="flex flex-col p-4 relative overflow-hidden group">
@@ -664,6 +664,59 @@ const DashboardPage: React.FC = () => {
     setTimeout(() => setNotification(null), 3000);
   };
 
+  // Dynamically calculate metrics
+  const activeSimulationsCount = store.activeSimulations.length;
+
+  const runningAgentsCount = useMemo(() => {
+    // Sum agents in simulations that are running
+    const simAgents = store.activeSimulations
+      .filter(sim => sim.status === 'running')
+      .reduce((acc, sim) => acc + sim.agents, 0);
+    // Add default running agents from current agents list (running status) if no running sims
+    return simAgents > 0 ? simAgents : store.agents.filter(a => a.status === 'running').length;
+  }, [store.activeSimulations, store.agents]);
+
+  const avgSuccessRate = useMemo(() => {
+    if (store.activeSimulations.length === 0) return 0;
+    const sum = store.activeSimulations.reduce((acc, sim) => acc + sim.success, 0);
+    return sum / store.activeSimulations.length;
+  }, [store.activeSimulations]);
+
+  const tokensUsedToday = useMemo(() => {
+    let total = 0;
+    store.agents.forEach(a => {
+      const str = (a.tokensUsed || '0').toLowerCase();
+      if (str.endsWith('m')) {
+        total += parseFloat(str) * 1000000;
+      } else if (str.endsWith('k')) {
+        total += parseFloat(str) * 1000;
+      } else {
+        total += parseFloat(str) || 0;
+      }
+    });
+    // Return in Millions
+    return total / 1000000;
+  }, [store.agents]);
+
+  const avgTrustScore = useMemo(() => {
+    if (store.agents.length === 0) return 0;
+    const sum = store.agents.reduce((acc, a) => acc + (a.trust || 0), 0);
+    return Math.round((sum / store.agents.length) * 100);
+  }, [store.agents]);
+
+  // Dynamically scale chart values
+  const chartData = useMemo(() => {
+    const baseAgents = runningAgentsCount || 10;
+    return [
+      { tick: 1, agents: Math.round(baseAgents * 0.6), conflicts: Math.max(0, store.conflicts.length - 2) },
+      { tick: 5, agents: Math.round(baseAgents * 0.7), conflicts: Math.max(0, store.conflicts.length - 1) },
+      { tick: 10, agents: Math.round(baseAgents * 0.8), conflicts: store.conflicts.length },
+      { tick: 15, agents: Math.round(baseAgents * 0.9), conflicts: Math.max(0, store.conflicts.length - 1) },
+      { tick: 20, agents: Math.round(baseAgents * 0.95), conflicts: Math.max(0, store.conflicts.length - 2) },
+      { tick: 24, agents: baseAgents, conflicts: store.conflicts.length }
+    ];
+  }, [runningAgentsCount, store.conflicts]);
+
   return (
     <div className="space-y-6">
       {/* Toast alert */}
@@ -683,12 +736,12 @@ const DashboardPage: React.FC = () => {
 
       {/* KPI Cards Row */}
       <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-4">
-        <MetricCard label="Active Simulations" value={12} icon={Activity} accent="text-gold-primary" />
-        <MetricCard label="Running Agents" value={847} icon={Bot} accent="text-[#00C896]" />
+        <MetricCard label="Active Simulations" value={activeSimulationsCount} icon={Activity} accent="text-gold-primary" />
+        <MetricCard label="Running Agents" value={runningAgentsCount} icon={Bot} accent="text-[#00C896]" />
         <MetricCard label="Conflict Alerts" value={store.conflicts.length} icon={AlertTriangle} accent="text-[#FF4444]" />
-        <MetricCard label="Success Rate" value={94} icon={TrendingUp} accent="text-gold-primary" isRate />
-        <MetricCard label="Tokens Used Today" value={2} icon={Zap} accent="text-gold-soft" isToken />
-        <MetricCard label="Avg Trust Score" value={78} icon={Shield} accent="text-info" />
+        <MetricCard label="Success Rate" value={avgSuccessRate} icon={TrendingUp} accent="text-gold-primary" isRate />
+        <MetricCard label="Tokens Used Today" value={tokensUsedToday} icon={Zap} accent="text-gold-soft" isToken />
+        <MetricCard label="Avg Trust Score" value={avgTrustScore} icon={Shield} accent="text-info" />
       </div>
 
       {/* Two Column Layout */}
@@ -701,16 +754,7 @@ const DashboardPage: React.FC = () => {
           </div>
           <div className="flex-1 min-h-0">
             <ResponsiveContainer width="100%" height="100%">
-              <AreaChart
-                data={[
-                  { tick: 1, agents: 500, conflicts: 1 },
-                  { tick: 5, agents: 520, conflicts: 2 },
-                  { tick: 10, agents: 560, conflicts: 1 },
-                  { tick: 15, agents: 640, conflicts: 3 },
-                  { tick: 20, agents: 730, conflicts: 0 },
-                  { tick: 24, agents: 847, conflicts: 2 }
-                ]}
-              >
+              <AreaChart data={chartData}>
                 <defs>
                   <linearGradient id="colorGreen" x1="0" y1="0" x2="0" y2="1">
                     <stop offset="5%" stopColor="#00C896" stopOpacity={0.4} />
