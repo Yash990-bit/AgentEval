@@ -54,7 +54,7 @@ export default function ConflictDashboard({ agents, links }: { agents: AgentNode
       const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
       // Fallback for local development vs same-origin proxy
       if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
-        return `ws://${window.location.hostname}:8000/api/v1/conflicts/ws`;
+        return `ws://127.0.0.1:8000/api/v1/conflicts/ws`;
       }
       return `${wsProtocol}//${window.location.host}/api/v1/conflicts/ws`;
     };
